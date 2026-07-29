@@ -13,7 +13,7 @@ class ModernGestureGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("NEXUS AI - Low Latency Virtual Mouse")
+        self.title("VITS AI - Ultra Smooth Virtual Mouse")
         self.geometry("1120x720")
         self.minsize(980, 640)
         self.configure(fg_color="#0b0f19")  # Modern dark background
@@ -39,7 +39,7 @@ class ModernGestureGUI(ctk.CTk):
         # Title & Badge
         title_label = ctk.CTkLabel(
             header_frame,
-            text="⚡ NEXUS AI GESTURE MOUSE",
+            text="⚡ VITS AI GESTURE MOUSE",
             font=ctk.CTkFont(family="Inter", size=20, weight="bold"),
             text_color="#38bdf8"
         )
@@ -47,7 +47,7 @@ class ModernGestureGUI(ctk.CTk):
 
         ver_badge = ctk.CTkLabel(
             header_frame,
-            text="v2.0 LOW-LATENCY",
+            text="v2.0 ULTRA-SMOOTH",
             font=ctk.CTkFont(size=11, weight="bold"),
             fg_color="#1e293b",
             text_color="#34d399",
@@ -77,7 +77,7 @@ class ModernGestureGUI(ctk.CTk):
         left_col.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
         video_header = ctk.CTkLabel(
-            left_col, text="📷 REALTIME VISION FEED & HUD",
+            left_col, text="📷 VITS REALTIME VISION FEED & HUD",
             font=ctk.CTkFont(size=14, weight="bold"), text_color="#94a3b8"
         )
         video_header.pack(anchor="w", padx=15, pady=(15, 5))
@@ -139,35 +139,39 @@ class ModernGestureGUI(ctk.CTk):
 
         self.sw_cursor = ctk.CTkSwitch(settings_box, text="Cursor Tracking", command=self.update_settings, progress_color="#0284c7")
         self.sw_cursor.select()
-        self.sw_cursor.pack(anchor="w", pady=6)
+        self.sw_cursor.pack(anchor="w", pady=5)
 
         self.sw_click = ctk.CTkSwitch(settings_box, text="Left / Right Clicks", command=self.update_settings, progress_color="#0284c7")
         self.sw_click.select()
-        self.sw_click.pack(anchor="w", pady=6)
+        self.sw_click.pack(anchor="w", pady=5)
 
         self.sw_drag = ctk.CTkSwitch(settings_box, text="Drag & Drop Hold", command=self.update_settings, progress_color="#0284c7")
         self.sw_drag.select()
-        self.sw_drag.pack(anchor="w", pady=6)
+        self.sw_drag.pack(anchor="w", pady=5)
 
         self.sw_scroll = ctk.CTkSwitch(settings_box, text="Gesture Scroll", command=self.update_settings, progress_color="#0284c7")
         self.sw_scroll.select()
-        self.sw_scroll.pack(anchor="w", pady=6)
+        self.sw_scroll.pack(anchor="w", pady=5)
+
+        self.sw_zoom = ctk.CTkSwitch(settings_box, text="Palm Zoom In / Out Gesture", command=self.update_settings, progress_color="#0284c7")
+        self.sw_zoom.select()
+        self.sw_zoom.pack(anchor="w", pady=5)
 
         self.sw_mirror = ctk.CTkSwitch(settings_box, text="Mirror Camera Horizontal", command=self.update_settings, progress_color="#0284c7")
         self.sw_mirror.select()
-        self.sw_mirror.pack(anchor="w", pady=6)
+        self.sw_mirror.pack(anchor="w", pady=5)
 
         # Divider
-        ctk.CTkFrame(settings_box, fg_color="#1e293b", height=2).pack(fill="x", pady=15)
+        ctk.CTkFrame(settings_box, fg_color="#1e293b", height=2).pack(fill="x", pady=12)
 
         # --- Section 2: Tuning Sliders ---
         sec2_title = ctk.CTkLabel(settings_box, text="SMOOTHNESS & SENSITIVITY", font=ctk.CTkFont(size=12, weight="bold"), text_color="#64748b")
         sec2_title.pack(anchor="w", pady=(0, 5))
 
         # Slider 1: Motion Filter Cutoff (Smoothness)
-        ctk.CTkLabel(settings_box, text="Filter Smoothness (Low = Smooth, High = Fast):", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
-        self.sl_cutoff = ctk.CTkSlider(settings_box, from_=0.02, to=0.3, number_of_steps=20, command=self.update_settings, progress_color="#38bdf8")
-        self.sl_cutoff.set(0.10)
+        ctk.CTkLabel(settings_box, text="Cursor Smoothness (Lower = Ultra-smooth):", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        self.sl_cutoff = ctk.CTkSlider(settings_box, from_=0.01, to=0.20, number_of_steps=20, command=self.update_settings, progress_color="#38bdf8")
+        self.sl_cutoff.set(0.03)
         self.sl_cutoff.pack(fill="x", pady=(2, 10))
 
         # Slider 2: ROI Margin
@@ -177,20 +181,20 @@ class ModernGestureGUI(ctk.CTk):
         self.sl_roi.pack(fill="x", pady=(2, 10))
 
         # Slider 3: Pinch Click Distance
-        ctk.CTkLabel(settings_box, text="Pinch Distance Threshold (Pixels):", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        ctk.CTkLabel(settings_box, text="Pinch Sensitivity Distance:", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
         self.sl_pinch = ctk.CTkSlider(settings_box, from_=20, to=60, number_of_steps=40, command=self.update_settings, progress_color="#38bdf8")
         self.sl_pinch.set(35)
         self.sl_pinch.pack(fill="x", pady=(2, 10))
 
         # Divider
-        ctk.CTkFrame(settings_box, fg_color="#1e293b", height=2).pack(fill="x", pady=15)
+        ctk.CTkFrame(settings_box, fg_color="#1e293b", height=2).pack(fill="x", pady=12)
 
         # Quick Instructions Card
         guide_card = ctk.CTkFrame(settings_box, fg_color="#0f172a", corner_radius=8)
         guide_card.pack(fill="x", pady=5)
 
-        ctk.CTkLabel(guide_card, text="💡 GESTURE QUICK GUIDE", font=ctk.CTkFont(size=11, weight="bold"), text_color="#38bdf8").pack(anchor="w", padx=10, pady=(8, 4))
-        ctk.CTkLabel(guide_card, text="• Move Index finger to control cursor\n• Pinch Index + Thumb = Left Click\n• Hold Pinch > 0.25s = Drag & Drop\n• Pinch Middle + Thumb = Right Click\n• Join Index + Middle = Scroll Up/Down",
+        ctk.CTkLabel(guide_card, text="💡 VITS GESTURE QUICK GUIDE", font=ctk.CTkFont(size=11, weight="bold"), text_color="#38bdf8").pack(anchor="w", padx=10, pady=(8, 4))
+        ctk.CTkLabel(guide_card, text="• Move Index finger to control cursor\n• Pinch Index + Thumb = Left Click\n• Hold Pinch > 0.25s = Drag & Drop\n• Pinch Extended Middle + Thumb = Right Click\n• Join Index + Extended Middle = Scroll\n• ✋ Open Palm Wide = Zoom In (Ctrl +)\n• ✊ Close / Contract Palm = Zoom Out (Ctrl -)",
                      font=ctk.CTkFont(size=10), text_color="#cbd5e1", justify="left").pack(anchor="w", padx=10, pady=(0, 8))
 
     def update_settings(self, *args):
@@ -198,6 +202,7 @@ class ModernGestureGUI(ctk.CTk):
         self.engine.enable_click = bool(self.sw_click.get())
         self.engine.enable_drag = bool(self.sw_drag.get())
         self.engine.enable_scroll = bool(self.sw_scroll.get())
+        self.engine.enable_zoom = bool(self.sw_zoom.get())
         self.engine.mirror = bool(self.sw_mirror.get())
 
         self.engine.filter.min_cutoff = self.sl_cutoff.get()

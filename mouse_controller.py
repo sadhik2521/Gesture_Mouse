@@ -25,10 +25,11 @@ class FastMouseController:
         self.click_cooldown = 0.25  # seconds debounce between clicks
         self.last_scroll_time = 0
         self.scroll_cooldown = 0.05
+        self.last_zoom_time = 0
+        self.zoom_cooldown = 0.25  # smooth debounce between zoom steps
         
     def move_to(self, x, y):
         """Ultra-fast Win32 cursor positioning (<1ms)"""
-        # Clamp to screen dimensions
         target_x = max(0, min(self.screen_w - 1, int(x)))
         target_y = max(0, min(self.screen_h - 1, int(y)))
         self.user32.SetCursorPos(target_x, target_y)
@@ -69,7 +70,24 @@ class FastMouseController:
         """Scroll wheel (positive = up, negative = down)"""
         now = time.time()
         if now - self.last_scroll_time > self.scroll_cooldown:
-            # Win32 wheel event expects amount * WHEEL_DELTA (120)
             clicks = int(amount * 120)
             self.user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, clicks, 0)
             self.last_scroll_time = now
+
+    def zoom_in(self):
+        """Triggers Zoom In (Ctrl + Plus) for active window"""
+        now = time.time()
+        if now - self.last_zoom_time > self.zoom_cooldown:
+            pyautogui.hotkey('ctrl', '=')
+            self.last_zoom_time = now
+            return True
+        return False
+
+    def zoom_out(self):
+        """Triggers Zoom Out (Ctrl + Minus) for active window"""
+        now = time.time()
+        if now - self.last_zoom_time > self.zoom_cooldown:
+            pyautogui.hotkey('ctrl', '-')
+            self.last_zoom_time = now
+            return True
+        return False
