@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from PIL import Image, ImageTk
+from PIL import Image
 import cv2
 import time
 import threading
@@ -9,222 +9,273 @@ from gesture_engine import GestureEngine, CameraStream
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
+
 class ModernGestureGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("VITS AI - Ultra Smooth Virtual Mouse")
-        self.geometry("1120x720")
+        self.title("AI Gesture Mouse v4.0 PRECISION")
+        self.geometry("1180x740")
         self.minsize(980, 640)
-        self.configure(fg_color="#0b0f19")  # Modern dark background
+        self.configure(fg_color="#080c15")
 
         # Core modules
-        self.mouse = FastMouseController()
+        self.mouse  = FastMouseController()
         self.engine = GestureEngine(self.mouse)
         self.camera_stream = None
-        self.is_running = False
+        self.is_running    = False
 
-        # Build UI layout
+        # Build UI
         self._build_header()
         self._build_main_layout()
 
-        # Start camera & loop
+        # Start engine
         self.start_engine()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    # ── Header ─────────────────────────────────────────────────────────────
+
     def _build_header(self):
-        header_frame = ctk.CTkFrame(self, fg_color="#131b2e", corner_radius=0, height=60)
-        header_frame.pack(fill="x", side="top", padx=0, pady=0)
+        hf = ctk.CTkFrame(self, fg_color="#0d1829", corner_radius=0, height=62)
+        hf.pack(fill="x", side="top")
 
-        # Title & Badge
-        title_label = ctk.CTkLabel(
-            header_frame,
-            text="⚡ VITS AI GESTURE MOUSE",
+        ctk.CTkLabel(
+            hf,
+            text="⚡ AI GESTURE MOUSE",
             font=ctk.CTkFont(family="Inter", size=20, weight="bold"),
-            text_color="#38bdf8"
-        )
-        title_label.pack(side="left", padx=20, pady=12)
+            text_color="#38bdf8",
+        ).pack(side="left", padx=20, pady=14)
 
-        ver_badge = ctk.CTkLabel(
-            header_frame,
-            text="v2.0 ULTRA-SMOOTH",
+        ctk.CTkLabel(
+            hf,
+            text="v3.0 PRECISION",
             font=ctk.CTkFont(size=11, weight="bold"),
-            fg_color="#1e293b",
-            text_color="#34d399",
-            corner_radius=6,
-            padx=8, pady=2
-        )
-        ver_badge.pack(side="left", padx=5)
+            fg_color="#1e293b", text_color="#34d399",
+            corner_radius=6, padx=8, pady=2,
+        ).pack(side="left", padx=4)
 
-        # Power Toggle Button
         self.power_btn = ctk.CTkButton(
-            header_frame,
+            hf,
             text="● ENGINE ACTIVE",
             font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#059669",
-            hover_color="#047857",
-            width=140, height=36,
-            command=self.toggle_engine
+            fg_color="#059669", hover_color="#047857",
+            width=148, height=36,
+            command=self.toggle_engine,
         )
-        self.power_btn.pack(side="right", padx=20, pady=12)
+        self.power_btn.pack(side="right", padx=20, pady=13)
+
+    # ── Main layout ────────────────────────────────────────────────────────
 
     def _build_main_layout(self):
-        main_container = ctk.CTkFrame(self, fg_color="transparent")
-        main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        main = ctk.CTkFrame(self, fg_color="transparent")
+        main.pack(fill="both", expand=True, padx=18, pady=16)
 
-        # Left Column: Video Feed & Metrics
-        left_col = ctk.CTkFrame(main_container, fg_color="#131b2e", corner_radius=12)
-        left_col.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        # ── Left column: video + metrics ──────────────────────────────────
+        left = ctk.CTkFrame(main, fg_color="#0d1829", corner_radius=12)
+        left.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
-        video_header = ctk.CTkLabel(
-            left_col, text="📷 VITS REALTIME VISION FEED & HUD",
-            font=ctk.CTkFont(size=14, weight="bold"), text_color="#94a3b8"
+        ctk.CTkLabel(
+            left,
+            text="📷 PRECISION VISION FEED  (HD Enhanced)",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#64748b",
+        ).pack(anchor="w", padx=14, pady=(13, 4))
+
+        self.video_container = ctk.CTkFrame(left, fg_color="#060a13", corner_radius=8)
+        self.video_container.pack(fill="both", expand=True, padx=14, pady=4)
+
+        self.video_label = ctk.CTkLabel(
+            self.video_container,
+            text="Initializing HD Camera…",
+            font=ctk.CTkFont(size=13),
+            text_color="#475569",
         )
-        video_header.pack(anchor="w", padx=15, pady=(15, 5))
-
-        # Video Label Container
-        self.video_container = ctk.CTkFrame(left_col, fg_color="#090d16", corner_radius=8)
-        self.video_container.pack(fill="both", expand=True, padx=15, pady=5)
-
-        self.video_label = ctk.CTkLabel(self.video_container, text="Initializing Camera Stream...")
         self.video_label.pack(fill="both", expand=True, padx=2, pady=2)
 
-        # Metrics Card Row below video
-        metrics_frame = ctk.CTkFrame(left_col, fg_color="#0f172a", corner_radius=8)
-        metrics_frame.pack(fill="x", padx=15, pady=(5, 15))
+        # Metrics row
+        mf = ctk.CTkFrame(left, fg_color="#0b1220", corner_radius=8)
+        mf.pack(fill="x", padx=14, pady=(4, 14))
 
-        # Metric 1: FPS
         self.fps_card = ctk.CTkLabel(
-            metrics_frame, text="⚡ FPS: --",
-            font=ctk.CTkFont(size=13, weight="bold"), text_color="#38bdf8",
-            width=120
+            mf, text="⚡ FPS: --",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#38bdf8", width=110,
         )
-        self.fps_card.pack(side="left", padx=15, pady=10)
+        self.fps_card.pack(side="left", padx=12, pady=8)
 
-        # Metric 2: Latency
         self.latency_card = ctk.CTkLabel(
-            metrics_frame, text="⏱️ Latency: -- ms",
-            font=ctk.CTkFont(size=13, weight="bold"), text_color="#a7f3d0",
-            width=140
+            mf, text="⏱ Latency: -- ms",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#a7f3d0", width=148,
         )
-        self.latency_card.pack(side="left", padx=15, pady=10)
+        self.latency_card.pack(side="left", padx=10, pady=8)
 
-        # Metric 3: Active Gesture Status Tag
+        self.conf_card = ctk.CTkLabel(
+            mf, text="🖐 Conf: --",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#fb923c", width=100,
+        )
+        self.conf_card.pack(side="left", padx=10, pady=8)
+
         self.status_card = ctk.CTkLabel(
-            metrics_frame, text="STATUS: IDLE",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            mf, text="STATUS: IDLE",
+            font=ctk.CTkFont(size=12, weight="bold"),
             fg_color="#1e293b", text_color="#facc15",
-            corner_radius=6, padx=12, pady=4
+            corner_radius=6, padx=12, pady=3,
         )
-        self.status_card.pack(side="right", padx=15, pady=8)
+        self.status_card.pack(side="right", padx=14, pady=7)
 
-        # Right Column: Controls & Configuration Panel
-        right_col = ctk.CTkFrame(main_container, fg_color="#131b2e", corner_radius=12, width=380)
-        right_col.pack(side="right", fill="both", expand=False, padx=(10, 0))
-        right_col.pack_propagate(False)
+        # ── Right column: settings ────────────────────────────────────────
+        right = ctk.CTkFrame(main, fg_color="#0d1829", corner_radius=12, width=390)
+        right.pack(side="right", fill="both", expand=False, padx=(10, 0))
+        right.pack_propagate(False)
 
-        panel_title = ctk.CTkLabel(
-            right_col, text="⚙️ CONTROL PANEL & SETTINGS",
-            font=ctk.CTkFont(size=15, weight="bold"), text_color="#f8fafc"
-        )
-        panel_title.pack(anchor="w", padx=20, pady=(15, 10))
+        ctk.CTkLabel(
+            right,
+            text="⚙️ CONTROL PANEL",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            text_color="#f1f5f9",
+        ).pack(anchor="w", padx=20, pady=(15, 8))
 
-        # Scrollable container for settings
-        settings_box = ctk.CTkScrollableFrame(right_col, fg_color="transparent")
-        settings_box.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        sb = ctk.CTkScrollableFrame(right, fg_color="transparent")
+        sb.pack(fill="both", expand=True, padx=14, pady=(0, 14))
 
-        # --- Section 1: Feature Toggles ---
-        sec1_title = ctk.CTkLabel(settings_box, text="FEATURE TOGGLES", font=ctk.CTkFont(size=12, weight="bold"), text_color="#64748b")
-        sec1_title.pack(anchor="w", pady=(5, 5))
+        # ── Feature toggles ───────────────────────────────────────────────
+        self._section(sb, "FEATURE TOGGLES")
 
-        self.sw_cursor = ctk.CTkSwitch(settings_box, text="Cursor Tracking", command=self.update_settings, progress_color="#0284c7")
-        self.sw_cursor.select()
-        self.sw_cursor.pack(anchor="w", pady=5)
+        self.sw_cursor = self._switch(sb, "Cursor Tracking", True)
+        self.sw_click  = self._switch(sb, "Left / Right Clicks", True)
+        self.sw_drag   = self._switch(sb, "Drag & Drop Hold", True)
+        self.sw_scroll = self._switch(sb, "Gesture Scroll", True)
+        self.sw_zoom   = self._switch(sb, "Palm Zoom In / Out", True)
+        self.sw_close  = self._switch(sb, "Pinky Close Window (Alt+F4)", True)
+        self.sw_mirror = self._switch(sb, "Mirror Camera", True)
+        self.sw_clahe  = self._switch(sb, "HD Camera Enhancement (CLAHE)", False)
 
-        self.sw_click = ctk.CTkSwitch(settings_box, text="Left / Right Clicks", command=self.update_settings, progress_color="#0284c7")
-        self.sw_click.select()
-        self.sw_click.pack(anchor="w", pady=5)
+        self._divider(sb)
 
-        self.sw_drag = ctk.CTkSwitch(settings_box, text="Drag & Drop Hold", command=self.update_settings, progress_color="#0284c7")
-        self.sw_drag.select()
-        self.sw_drag.pack(anchor="w", pady=5)
+        # ── Precision tuning ──────────────────────────────────────────────
+        self._section(sb, "PRECISION TUNING")
 
-        self.sw_scroll = ctk.CTkSwitch(settings_box, text="Gesture Scroll", command=self.update_settings, progress_color="#0284c7")
-        self.sw_scroll.select()
-        self.sw_scroll.pack(anchor="w", pady=5)
-
-        self.sw_zoom = ctk.CTkSwitch(settings_box, text="Palm Zoom In / Out Gesture", command=self.update_settings, progress_color="#0284c7")
-        self.sw_zoom.select()
-        self.sw_zoom.pack(anchor="w", pady=5)
-
-        self.sw_mirror = ctk.CTkSwitch(settings_box, text="Mirror Camera Horizontal", command=self.update_settings, progress_color="#0284c7")
-        self.sw_mirror.select()
-        self.sw_mirror.pack(anchor="w", pady=5)
-
-        # Divider
-        ctk.CTkFrame(settings_box, fg_color="#1e293b", height=2).pack(fill="x", pady=12)
-
-        # --- Section 2: Tuning Sliders ---
-        sec2_title = ctk.CTkLabel(settings_box, text="SMOOTHNESS & SENSITIVITY", font=ctk.CTkFont(size=12, weight="bold"), text_color="#64748b")
-        sec2_title.pack(anchor="w", pady=(0, 5))
-
-        # Slider 1: Motion Filter Cutoff (Smoothness)
-        ctk.CTkLabel(settings_box, text="Cursor Smoothness (Lower = Ultra-smooth):", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
-        self.sl_cutoff = ctk.CTkSlider(settings_box, from_=0.01, to=0.20, number_of_steps=20, command=self.update_settings, progress_color="#38bdf8")
-        self.sl_cutoff.set(0.03)
+        ctk.CTkLabel(sb, text="Cursor Smoothness  (lower = snappier / real-mouse feel):",
+                     font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        self.sl_cutoff = ctk.CTkSlider(sb, from_=0.05, to=0.50, number_of_steps=45,
+                                       command=self.update_settings, progress_color="#38bdf8")
+        self.sl_cutoff.set(0.18)
         self.sl_cutoff.pack(fill="x", pady=(2, 10))
 
-        # Slider 2: ROI Margin
-        ctk.CTkLabel(settings_box, text="Active ROI Box Size (Smaller = Less arm reach):", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
-        self.sl_roi = ctk.CTkSlider(settings_box, from_=0.05, to=0.30, number_of_steps=25, command=self.update_settings, progress_color="#38bdf8")
-        self.sl_roi.set(0.15)
+        ctk.CTkLabel(sb, text="Active ROI Zone Size  (smaller = less arm movement):",
+                     font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        self.sl_roi = ctk.CTkSlider(sb, from_=0.03, to=0.25, number_of_steps=22,
+                                    command=self.update_settings, progress_color="#38bdf8")
+        self.sl_roi.set(0.08)
         self.sl_roi.pack(fill="x", pady=(2, 10))
 
-        # Slider 3: Pinch Click Distance
-        ctk.CTkLabel(settings_box, text="Pinch Sensitivity Distance:", font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
-        self.sl_pinch = ctk.CTkSlider(settings_box, from_=20, to=60, number_of_steps=40, command=self.update_settings, progress_color="#38bdf8")
-        self.sl_pinch.set(35)
+        ctk.CTkLabel(sb, text="Pinch Click Sensitivity  (lower = tighter pinch needed):",
+                     font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        self.sl_pinch = ctk.CTkSlider(sb, from_=15, to=55, number_of_steps=40,
+                                      command=self.update_settings, progress_color="#38bdf8")
+        self.sl_pinch.set(32)
         self.sl_pinch.pack(fill="x", pady=(2, 10))
 
-        # Divider
-        ctk.CTkFrame(settings_box, fg_color="#1e293b", height=2).pack(fill="x", pady=12)
+        ctk.CTkLabel(sb, text="Scroll Speed:",
+                     font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        self.sl_scroll = ctk.CTkSlider(sb, from_=0.5, to=5.0, number_of_steps=45,
+                                       command=self.update_settings, progress_color="#38bdf8")
+        self.sl_scroll.set(2.0)
+        self.sl_scroll.pack(fill="x", pady=(2, 10))
 
-        # Quick Instructions Card
-        guide_card = ctk.CTkFrame(settings_box, fg_color="#0f172a", corner_radius=8)
-        guide_card.pack(fill="x", pady=5)
+        self._divider(sb)
 
-        ctk.CTkLabel(guide_card, text="💡 VITS GESTURE QUICK GUIDE", font=ctk.CTkFont(size=11, weight="bold"), text_color="#38bdf8").pack(anchor="w", padx=10, pady=(8, 4))
-        ctk.CTkLabel(guide_card, text="• Move Index finger to control cursor\n• Pinch Index + Thumb = Left Click\n• Hold Pinch > 0.25s = Drag & Drop\n• Pinch Extended Middle + Thumb = Right Click\n• Join Index + Extended Middle = Scroll\n• ✋ Open Palm Wide = Zoom In (Ctrl +)\n• ✊ Close / Contract Palm = Zoom Out (Ctrl -)",
-                     font=ctk.CTkFont(size=10), text_color="#cbd5e1", justify="left").pack(anchor="w", padx=10, pady=(0, 8))
+        # ── Camera info ───────────────────────────────────────────────────
+        self._section(sb, "CAMERA STATUS")
+        self.cam_res_label = ctk.CTkLabel(
+            sb, text="Resolution: initializing…",
+            font=ctk.CTkFont(size=11), text_color="#64748b",
+        )
+        self.cam_res_label.pack(anchor="w", pady=(2, 8))
 
-    def update_settings(self, *args):
-        self.engine.enable_cursor = bool(self.sw_cursor.get())
-        self.engine.enable_click = bool(self.sw_click.get())
-        self.engine.enable_drag = bool(self.sw_drag.get())
-        self.engine.enable_scroll = bool(self.sw_scroll.get())
-        self.engine.enable_zoom = bool(self.sw_zoom.get())
-        self.engine.mirror = bool(self.sw_mirror.get())
+        self._divider(sb)
 
-        self.engine.filter.min_cutoff = self.sl_cutoff.get()
-        self.engine.roi_margin = self.sl_roi.get()
-        self.engine.click_threshold = int(self.sl_pinch.get())
-        self.engine.right_click_threshold = int(self.sl_pinch.get())
+        # ── Gesture guide ─────────────────────────────────────────────────
+        guide = ctk.CTkFrame(sb, fg_color="#0b1220", corner_radius=8)
+        guide.pack(fill="x", pady=5)
+
+        ctk.CTkLabel(guide, text="💡 GESTURE QUICK GUIDE",
+                     font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color="#38bdf8").pack(anchor="w", padx=10, pady=(8, 4))
+
+        guide_text = (
+            "☝ 1 Finger (Index)   → Move Cursor\n"
+            "✌ 2 Fingers (V-Sign)  → Left Click\n"
+            "🤟 3 Fingers Extended → Right Click\n"
+            "🤏 Quick Pinch (<0.25s)→ Double Click (Open App/Folder)\n"
+            "🤏 Pinch & Hold (>0.25s)→ Drag & Drop (Open fingers to Drop)\n"
+            "🤙 Pinky Extended     → Close Window (Alt+F4)\n"
+            "🖐 Open Palm (5 Fing) → Scroll Up/Down\n"
+            "🤘 Rock Sign (Index+Pinky)→ Zoom In (Move Up) / Zoom Out (Move Down)\n"
+            "\n💡 ULTRA-EASY CONTROL: Show finger signs for\n"
+            "   instant mouse actions!"
+        )
+        ctk.CTkLabel(guide, text=guide_text,
+                     font=ctk.CTkFont(size=10), text_color="#cbd5e1",
+                     justify="left").pack(anchor="w", padx=10, pady=(0, 10))
+
+    # ── Widget helpers ─────────────────────────────────────────────────────
+
+    def _section(self, parent, text):
+        ctk.CTkLabel(parent, text=text,
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color="#334155").pack(anchor="w", pady=(6, 5))
+
+    def _divider(self, parent):
+        ctk.CTkFrame(parent, fg_color="#1e293b", height=2).pack(fill="x", pady=10)
+
+    def _switch(self, parent, label, default=True):
+        sw = ctk.CTkSwitch(parent, text=label,
+                           command=self.update_settings,
+                           progress_color="#0284c7")
+        if default:
+            sw.select()
+        sw.pack(anchor="w", pady=4)
+        return sw
+
+    # ── Settings sync ──────────────────────────────────────────────────────
+
+    def update_settings(self, *_):
+        self.engine.enable_cursor  = bool(self.sw_cursor.get())
+        self.engine.enable_click   = bool(self.sw_click.get())
+        self.engine.enable_drag    = bool(self.sw_drag.get())
+        self.engine.enable_scroll  = bool(self.sw_scroll.get())
+        self.engine.enable_zoom    = bool(self.sw_zoom.get())
+        self.engine.enable_close   = bool(self.sw_close.get())
+        self.engine.mirror         = bool(self.sw_mirror.get())
+        self.engine.enhance_camera = bool(self.sw_clahe.get())
+
+        self.engine.filter.min_cutoff      = self.sl_cutoff.get()
+        self.engine.roi_margin             = self.sl_roi.get()
+        self.engine.click_threshold        = int(self.sl_pinch.get())
+        self.engine.right_click_threshold  = int(self.sl_pinch.get())
+        self.engine.scroll_sensitivity     = self.sl_scroll.get()
 
     def toggle_engine(self):
         self.engine.enabled = not self.engine.enabled
         if self.engine.enabled:
-            self.power_btn.configure(text="● ENGINE ACTIVE", fg_color="#059669", hover_color="#047857")
+            self.power_btn.configure(text="● ENGINE ACTIVE",
+                                     fg_color="#059669", hover_color="#047857")
         else:
-            self.power_btn.configure(text="○ ENGINE PAUSED", fg_color="#dc2626", hover_color="#b91c1c")
+            self.power_btn.configure(text="○ ENGINE PAUSED",
+                                     fg_color="#dc2626", hover_color="#b91c1c")
+
+    # ── Camera & update loop ───────────────────────────────────────────────
 
     def start_engine(self):
+        # 640x480 — natural brightness, works on all webcams
         self.camera_stream = CameraStream(src=0, width=640, height=480, fps=60)
-        self.is_running = True
-        self.prev_time = time.time()
-        self.frame_count = 0
-        self.calculated_fps = 0
-
-        # Start update loop on main thread via tkinter after()
+        self.is_running    = True
+        self.prev_time     = time.time()
+        self.frame_count   = 0
+        self.calculated_fps = 0.0
         self.update_feed()
 
     def update_feed(self):
@@ -233,35 +284,42 @@ class ModernGestureGUI(ctk.CTk):
 
         ret, frame = self.camera_stream.read()
         if ret and frame is not None:
-            # Process frame with gesture engine
-            annotated_frame = self.engine.process_frame(frame)
+            annotated = self.engine.process_frame(frame)
 
-            # FPS calculation
+            # FPS
             self.frame_count += 1
             now = time.time()
             if now - self.prev_time >= 1.0:
                 self.calculated_fps = self.frame_count / (now - self.prev_time)
-                self.frame_count = 0
-                self.prev_time = now
+                self.frame_count    = 0
+                self.prev_time      = now
 
-            # Update metrics UI
+            # Metrics
             self.fps_card.configure(text=f"⚡ FPS: {self.calculated_fps:.1f}")
-            self.latency_card.configure(text=f"⏱️ Latency: {self.engine.latency_ms:.1f} ms")
+            self.latency_card.configure(text=f"⏱ Latency: {self.engine.latency_ms:.1f} ms")
+            conf_pct = self.engine.hand_confidence * 100
+            self.conf_card.configure(
+                text=f"🖐 Conf: {conf_pct:.0f}%" if conf_pct > 0 else "🖐 Conf: --"
+            )
             self.status_card.configure(text=f"STATUS: {self.engine.active_gesture}")
 
-            # Convert BGR to RGB for Tkinter PIL display
-            cv2_image = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(cv2_image)
+            # Camera resolution label (updated once per second)
+            aw = self.camera_stream.actual_width
+            ah = self.camera_stream.actual_height
+            self.cam_res_label.configure(text=f"Resolution: {aw}×{ah}  |  Target: 1280×720")
 
-            # Resize dynamically to match container size
-            cw = max(320, self.video_container.winfo_width() - 10)
-            ch = max(240, self.video_container.winfo_height() - 10)
-            img = img.resize((cw, ch), Image.Resampling.NEAREST)
+            # Convert & display — LANCZOS for high-quality upscaling
+            rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(rgb)
+
+            cw = max(320, self.video_container.winfo_width()  - 8)
+            ch = max(240, self.video_container.winfo_height() - 8)
+            img = img.resize((cw, ch), Image.Resampling.LANCZOS)
 
             ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(cw, ch))
             self.video_label.configure(image=ctk_img, text="")
 
-        # Schedule next frame (~60 FPS target)
+        # ~60 FPS update loop
         self.after(16, self.update_feed)
 
     def on_closing(self):
@@ -269,6 +327,7 @@ class ModernGestureGUI(ctk.CTk):
         if self.camera_stream:
             self.camera_stream.stop()
         self.destroy()
+
 
 if __name__ == "__main__":
     app = ModernGestureGUI()

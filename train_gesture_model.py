@@ -1,5 +1,5 @@
 """
-VITS AI Gesture Mouse - Gesture Dataset Collector & Neural Network Model Trainer
+AI Gesture Mouse - Gesture Dataset Collector & Neural Network Model Trainer
 Collects MediaPipe 3D hand landmark coordinates (21 landmarks * 3 = 63 features) from your webcam,
 trains a Deep Neural Network (MLP) gesture classifier across 500 epochs, and plots the exact 
 Training/Validation Accuracy and Loss curves.
@@ -46,7 +46,7 @@ class GestureDataCollector:
         }
 
     def collect_data(self, samples_per_class=200):
-        print("=== VITS AI GESTURE DATA COLLECTOR ===")
+        print("=== AI GESTURE DATA COLLECTOR ===")
         print("Prepare your webcam. Press keys 0 to 5 to record samples for each gesture class:")
         for k, v in self.classes.items():
             print(f"  Key '{k}': {v}")
@@ -81,7 +81,7 @@ class GestureDataCollector:
             
             cv2.putText(frame, "Press 0-5 to record class | 'q' to quit", (20, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.imshow("VITS Gesture Dataset Collector", frame)
+            cv2.imshow("Gesture Dataset Collector", frame)
             
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
@@ -130,10 +130,10 @@ def train_model(epochs=500):
         ])
         
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        print("Training VITS Gesture Classifier over 500 epochs...")
+        print("Training Gesture Classifier over 500 epochs...")
         history = model.fit(X, y_cat, epochs=epochs, batch_size=32, validation_split=0.2)
-        model.save("vits_gesture_model.h5")
-        print("✓ Trained model saved to vits_gesture_model.h5")
+        model.save("gesture_model.h5")
+        print("✓ Trained model saved to gesture_model.h5")
 
 if __name__ == "__main__":
     collector = GestureDataCollector()
