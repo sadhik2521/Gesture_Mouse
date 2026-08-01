@@ -413,6 +413,12 @@ class GestureEngine:
         self.prev_scroll_y     = None
         self.prev_zoom_y       = None
 
+        # ── Drag & Drop Hysteresis & Grace Period ──────────────────────────
+        self.drag_release_multiplier = 1.75    # 1.75x distance threshold when holding pinch/drag
+        self.drag_loss_frames       = 0       # frames since hand tracking was lost during drag
+        self.max_drag_loss_frames   = 10      # ~300ms dropout protection before releasing drag
+        self.last_valid_drag_pos    = None    # last (screen_x, screen_y) position during drag
+
         # Double-click: deferred single-click approach
         # On first quick release we do NOT fire immediately — we wait up to
         # _double_click_gap seconds. If a second quick pinch-release arrives
@@ -498,6 +504,7 @@ class GestureEngine:
         hand_in_roi          = False
 
         if self.hand_detected and self.enabled:
+            self.drag_loss_frames = 0  # reset tracking loss counter when hand is visible
             hand_lms = result.multi_hand_landmarks[0]
 
             # Extract confidence if available
@@ -529,9 +536,13 @@ class GestureEngine:
             hand_scale = max(30.0, math.hypot(x_mid_mcp - x_wrist, y_mid_mcp - y_wrist))
 
             # ── Cursor control position ────────────────────────────────────
-            # Use Index fingertip directly for precise aiming
-            ctrl_x = x_idx
-            ctrl_y = y_idx
+            # Use Index-Thumb midpoint during pinch/drag to eliminate squeeze displacement, else Index tip
+            if self.is_pinched or self.mouse.is_dragging:
+                ctrl_x = int((x_idx + x_thumb) / 2)
+                ctrl_y = int((y_idx + y_thumb) / 2)
+            else:
+                ctrl_x = x_idx
+                ctrl_y = y_idx
 
             hand_in_roi = (rx1 <= ctrl_x <= rx2 and ry1 <= ctrl_y <= ry2)
 
@@ -561,50 +572,66 @@ class GestureEngine:
             screen_x, screen_y = self.filter.filter(norm_x, norm_y)
 
             # ── Cursor stillness lock ──────────────────────────────────────
-            # Rolling-buffer approach: require N consecutive close positions
-            # before locking (prevents premature lock during slow deliberate moves)
-            self._still_buf.append((screen_x, screen_y))
-            if len(self._still_buf) > self._still_buf_size:
-                self._still_buf.pop(0)
+            # Bypass stillness lock during drag so slow deliberate drag moves remain 100% fluid & responsive
+            if self.mouse.is_dragging or self.is_pinched:
+                self._locked = False
+                self._still_buf.clear()
+            else:
+                self._still_buf.append((screen_x, screen_y))
+                if len(self._still_buf) > self._still_buf_size:
+                    self._still_buf.pop(0)
 
-            if len(self._still_buf) == self._still_buf_size:
-                xs = [p[0] for p in self._still_buf]
-                ys = [p[1] for p in self._still_buf]
-                spread = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
-                if spread < 2.5:
-                    # Hand is genuinely stationary — lock to centroid for precision
-                    self._locked = True
-                    self._lock_x = sum(xs) / len(xs)
-                    self._lock_y = sum(ys) / len(ys)
-                else:
-                    self._locked = False
+                if len(self._still_buf) == self._still_buf_size:
+                    xs = [p[0] for p in self._still_buf]
+                    ys = [p[1] for p in self._still_buf]
+                    spread = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+                    if spread < 2.5:
+                        # Hand is genuinely stationary — lock to centroid for precision
+                        self._locked = True
+                        self._lock_x = sum(xs) / len(xs)
+                        self._lock_y = sum(ys) / len(ys)
+                    else:
+                        self._locked = False
 
             final_x = self._lock_x if self._locked else screen_x
             final_y = self._lock_y if self._locked else screen_y
+            self.last_valid_drag_pos = (final_x, final_y)
 
             # ── Move cursor ───────────────────────────────────────────────
             if self.enable_cursor and not all_folded:
                 self.mouse.move_to(final_x, final_y)
                 self.active_gesture = "MOVING"
 
-            # ── Pinch distances (normalized to hand scale) ─────────────────
+            # ── Pinch distances with Hysteresis (normalized to hand scale) ──
             dist_L = math.hypot(x_idx - x_thumb, y_idx - y_thumb)  # Index ↔ Thumb
             dist_R = math.hypot(x_mid - x_thumb, y_mid - y_thumb)  # Middle ↔ Thumb
 
-            thresh = self.click_threshold / 100.0 * hand_scale
+            start_thresh = self.click_threshold / 100.0 * hand_scale
 
-            is_left_pinched  = dist_L < thresh
-            is_right_pinched = dist_R < thresh and middle_ext and not index_ext
+            # Hysteresis: If already pinched or dragging, require fingers to spread significantly wider to release
+            if self.is_pinched or self.mouse.is_dragging:
+                release_thresh = start_thresh * self.drag_release_multiplier
+                is_left_pinched = dist_L < release_thresh
+            else:
+                is_left_pinched = dist_L < start_thresh
 
-            # Visual touch lines
-            cv2.line(frame, (x_idx, y_idx), (x_thumb, y_thumb),
-                     (0, 255, 80) if is_left_pinched else (0, 100, 255), 2, cv2.LINE_AA)
+            is_right_pinched = dist_R < start_thresh and middle_ext and not index_ext
+
+            # Visual touch lines & markers
+            line_color = (0, 255, 255) if self.mouse.is_dragging else ((0, 255, 80) if is_left_pinched else (0, 100, 255))
+            line_thick = 3 if self.mouse.is_dragging else 2
+            cv2.line(frame, (x_idx, y_idx), (x_thumb, y_thumb), line_color, line_thick, cv2.LINE_AA)
+
             if middle_ext:
                 cv2.line(frame, (x_mid, y_mid), (x_thumb, y_thumb),
                          (255, 60, 0) if is_right_pinched else (80, 80, 80), 1, cv2.LINE_AA)
-            # Index fingertip marker
+            # Index fingertip & pinch center markers
             cv2.circle(frame, (x_idx, y_idx), 8, (255, 0, 220), cv2.FILLED, cv2.LINE_AA)
             cv2.circle(frame, (x_idx, y_idx), 8, (255, 255, 255), 1, cv2.LINE_AA)
+            if self.mouse.is_dragging:
+                mid_x = int((x_idx + x_thumb) / 2)
+                mid_y = int((y_idx + y_thumb) / 2)
+                cv2.circle(frame, (mid_x, mid_y), 12, (0, 255, 255), 2, cv2.LINE_AA)
 
             # ═══ GESTURE LOGIC ════════════════════════════════════════════════════════════
             # 1. SCROLL:       🖐 Open Palm (5 Fingers Extended) -> Pure Scrolling (NO Clicks!)
@@ -616,6 +643,8 @@ class GestureEngine:
             # 7. CLOSE WINDOW: 🤙 Pinky Extended Only (Shaka Sign) -> Alt+F4
 
             four_fingers   = index_ext and middle_ext and ring_ext and pinky_ext
+            four_folded    = not index_ext and not middle_ext and not ring_ext and not pinky_ext
+            thumb_up_pose  = four_folded and (y_thumb < y_wrist) and (y_thumb < y_idx_mcp) and (math.hypot(x_thumb - x_wrist, y_thumb - y_wrist) > 0.85 * hand_scale)
             is_scroll_pose = four_fingers
             is_zoom_pose   = index_ext and pinky_ext and not middle_ext and not ring_ext
 
@@ -657,7 +686,18 @@ class GestureEngine:
                 else:
                     self.prev_zoom_y = y_idx
 
-            # --- GESTURE 3 & 4: PINCH (Pinch Hold = Drag, Quick Pinch = Double Click) ---
+            # --- GESTURE 3: DOUBLE CLICK (Thumbs Up Pose 👍) ---
+            elif thumb_up_pose and not is_left_pinched and self.enable_click:
+                self.prev_scroll_y = None
+                self.prev_zoom_y   = None
+                done = self.mouse.double_click()
+                if done:
+                    self.active_gesture = "DOUBLE CLICK"
+                    print(f"[GESTURE]: {self.active_gesture}")
+                    cv2.putText(frame, "DOUBLE CLICK (Thumbs Up 👍)", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
+
+            # --- GESTURE 4: DRAG & DROP (Pinch & Hold Index + Thumb) ---
             elif is_left_pinched:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
@@ -666,14 +706,14 @@ class GestureEngine:
                     self.pinch_start_time = time.perf_counter()
 
                 hold_dur = time.perf_counter() - self.pinch_start_time
-                if hold_dur > 0.25 and self.enable_drag:
-                    # Pinch Hold > 0.25s -> DRAG START!
+                if hold_dur > 0.15 and self.enable_drag:
+                    # Pinch Hold > 0.15s -> DRAG START!
                     self.mouse.start_drag()
                     if self.active_gesture != "DRAGGING":
                         self.active_gesture = "DRAGGING"
                         print(f"[GESTURE]: {self.active_gesture}")
-                    cv2.putText(frame, "DRAGGING (Pinch Hold)", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2, cv2.LINE_AA)
+                    cv2.putText(frame, "DRAGGING (Spread fingers to Drop)", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 255, 255), 2, cv2.LINE_AA)
                 else:
                     cv2.putText(frame, "PINCHING...", (40, 55),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
@@ -716,18 +756,9 @@ class GestureEngine:
                 if not is_zoom_pose:
                     self.prev_zoom_y = None
 
-                # Release pinch logic
+                # Release pinch logic (Drop)
                 if self.is_pinched:
-                    hold_dur = time.perf_counter() - self.pinch_start_time
-                    if hold_dur <= 0.25 and self.enable_click:
-                        # Quick pinch release < 0.25s -> DOUBLE CLICK!
-                        done = self.mouse.double_click()
-                        if done:
-                            self.active_gesture = "DOUBLE CLICK"
-                            print(f"[GESTURE]: {self.active_gesture}")
-                            cv2.putText(frame, "DOUBLE CLICK", (40, 55),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
-                    elif self.mouse.is_dragging:
+                    if self.mouse.is_dragging:
                         # Open fingers -> DROP!
                         self.mouse.stop_drag()
                         self.active_gesture = "DROP"
@@ -741,16 +772,29 @@ class GestureEngine:
             self._draw_edge_indicator(frame, final_x, final_y, w, h)
 
         else:
-            # No hand detected — reset all state
-            self.filter.reset()
-            self.prev_scroll_y  = None
-            self._still_frames  = 0
-            self._still_buf     = []
-            self._locked        = False
-            if self.mouse.is_dragging:
-                self.mouse.stop_drag()
-            self.active_gesture  = "SEARCHING HAND..." if self.enabled else "DISABLED"
-            self.hand_confidence = 0.0
+            # Check for hand-loss grace period while dragging
+            if self.mouse.is_dragging and self.drag_loss_frames < self.max_drag_loss_frames:
+                self.drag_loss_frames += 1
+                # Keep holding cursor position and maintain drag state!
+                if self.last_valid_drag_pos:
+                    self.mouse.move_to(self.last_valid_drag_pos[0], self.last_valid_drag_pos[1])
+                cv2.putText(frame, f"DRAGGING (Holding... {self.max_drag_loss_frames - self.drag_loss_frames}f)",
+                            (40, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 200, 255), 2, cv2.LINE_AA)
+                self.active_gesture = "DRAGGING (HOLDING)"
+            else:
+                # Hand fully lost or grace period expired — reset all state
+                self.drag_loss_frames = 0
+                self.filter.reset()
+                self.prev_scroll_y  = None
+                self._still_frames  = 0
+                self._still_buf     = []
+                self._locked        = False
+                if self.mouse.is_dragging:
+                    self.mouse.stop_drag()
+                    self.is_pinched = False
+                    print("[GESTURE]: DROP (Hand Lost)")
+                self.active_gesture  = "SEARCHING HAND..." if self.enabled else "DISABLED"
+                self.hand_confidence = 0.0
 
         # ROI overlay
         self._draw_roi_box(frame, rx1, ry1, rx2, ry2, hand_in_roi)

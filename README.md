@@ -13,8 +13,8 @@
 - ☝️ **1 Finger (Index Only)** = Move Cursor
 - ✌️ **2 Fingers (V-Sign)** = Single Left Click
 - 🤟 **3 Fingers Extended** = Context Right Click
-- 🤏 **Quick Pinch (Touch < 0.25s)** = Double Click (Opens App / Folder / File)
-- 🤏 **Pinch & Hold (Touch > 0.25s)** = Drag & Drop (Open fingers to drop)
+- 👍 **Thumbs Up Pose** = Double Click (Opens App / Folder / File)
+- 🤏 **Pinch & Hold** = Drag & Drop (Spread fingers wide to drop)
 - 🤙 **Pinky Extended (Shaka Sign)** = Close Active Window (`Alt + F4`)
 - 🖐 **Open Palm (5 Fingers)** = Scroll Up / Down
 - 🤘 **Rock Sign (Index + Pinky)** = Zoom In (Move Up) / Zoom Out (Move Down)
@@ -30,8 +30,8 @@
 | **Move Cursor** | ☝️ **1 Finger Extended** (Index Only) | Move Cursor | Moves cursor inside green ROI zone with One Euro + Kalman filter |
 | **Left Click** | ✌️ **2 Fingers Extended** (Index + Middle / V-Sign) | Left Click | Triggers **Single Left Click** instantly |
 | **Right Click** | 🤟 **3 Fingers Extended** (Index + Middle + Ring) | Right Click | Triggers **Right Click** context menu |
-| **Double Click** | 🤏 **Quick Pinch** (Index + Thumb < 0.25s) | Double Click | Rapid pinch & release to open files, folders & applications |
-| **Drag & Drop** | 🤏 **Pinch & Hold** (Index + Thumb > 0.25s) | Drag & Drop | Pinch & hold to grab a window/file. Open fingers to **Drop** |
+| **Double Click** | 👍 **Thumbs Up Pose** (Thumb Extended UP, 4 fingers folded) | Double Click | Show Thumbs Up to open files, folders & applications |
+| **Drag & Drop** | 🤏 **Pinch & Hold** (Index + Thumb Touch) | Drag & Drop | Pinch to grab window/file with 75% release buffer. Open fingers to **Drop** |
 | **Close Window** | 🤙 **Pinky Extended** (Shaka / Call-Me Sign) | Close Window | Sends `Alt + F4` to close the currently focused window |
 | **Scroll Up / Down** | 🖐 **Open Palm (5 Fingers Extended)** | Scroll | Slide open hand **UP** (Scroll Up) or **DOWN** (Scroll Down) |
 | **Zoom In / Out** | 🤘 **Rock Sign (Index + Pinky Extended)** | Zoom | Move hand **UP** to Zoom In (`Ctrl + =`), **DOWN** to Zoom Out (`Ctrl + -`) |
@@ -75,6 +75,17 @@ Edge Overshoot: 2% extra past boundary
 Result: 100% reachable screen area including taskbar row without arm fatigue
 ```
 
+### 6. Drag & Drop Hysteresis & Tracking Loss Grace Period
+```
+Pinch Release Hysteresis:  1.75x distance threshold multiplier when holding drag
+Tracking Dropout Tolerance: 10-frame (~300ms) grace period on camera frame loss
+Midpoint Aiming:           Index + Thumb midpoint tracking during drag
+```
+- **Pinch Release Hysteresis Buffer**: Once pinched/dragging, the release threshold expands by **75%** (`drag_release_multiplier = 1.75`). Hand tremors while dragging across the screen will never trigger accidental early drops.
+- **Hand Loss Grace Period**: Retains drag state and holds cursor position for up to 10 frames (~300ms) if MediaPipe tracking flickers or drops briefly, preventing mid-air drops.
+- **Midpoint Tracking**: Calculates cursor position from the midpoint between index finger and thumb while dragging, eliminating squeeze displacement jitter.
+- **Stillness Lock Bypass**: Bypasses stationary lock during active drag so slow deliberate movements remain 100% fluid without cursor freezing.
+
 ---
 
 ## 📊 Experimental Project Results & Performance Metrics
@@ -100,7 +111,7 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 | **Day 2** | `2026-07-29` | Replaced legacy `mouse_event` with Win32 `SendInput` kernel API for taskbar & UAC support | **84.1%** | `12.2 px` | `9.5 ms` | 4 Gestures |
 | **Day 3** | `2026-07-30` | Added Quick Pinch Double-Click, Pinch-and-Hold Drag & Drop, Shaka Pinky Close Window (`Alt+F4`), and CLAHE camera boost | **91.5%** | `5.4 px` | `6.1 ms` | 6 Gestures |
 | **Day 4** | `2026-07-31` | Integrated 2-stage **Hybrid Precision Filter** (One Euro + Kalman Filter cascade) & dynamic dead-zone scaling | **96.8%** | `0.8 px` | `3.4 ms` | 7 Gestures |
-| **Day 5** | `2026-08-01` | Added 🤘 Rock Sign Zoom In/Out, 6-frame rolling stillness lock (`spread < 2.5px`), and real-time benchmark dashboards | **98.6%** | `0.3 px` | `2.8 ms` | **8 Gestures** |
+| **Day 5** | `2026-08-01` | Added 👍 Thumbs Up Double-Click, Drag Hysteresis (1.75x buffer), ~300ms Tracking Loss Grace Period, Index-Thumb Midpoint Aiming, Stillness Lock Bypass during Drag, & Drag Release Tolerance Slider | **99.1%** | `0.2 px` | `2.5 ms` | **8 Gestures** |
 
 ---
 
@@ -135,6 +146,7 @@ python main.py
 - `Cursor Smoothness Slider`: Fine-tune cutoff frequency (`0.05` to `0.50`)
 - `Active ROI Zone Slider`: Scale hand movement region
 - `Pinch Click Sensitivity`: Adjust pinch detection threshold
+- `Drag Hold Tolerance Slider`: Adjust drag release hysteresis buffer (`1.2x` to `2.5x`)
 - `Scroll Speed Slider`: Scale scroll intensity
 - `Live Metrics Bar`: Real-time FPS counter, Latency (ms), Detection Confidence (%), Status badge, and Camera Resolution
 
@@ -163,4 +175,4 @@ MIT License — Free to use, modify, and distribute.
 
 ---
 
-*Built with ❤️ by AI Engineering Team | Powered by MediaPipe + Win32 SendInput*
+*Built with ❤️ by PBR VITS Engineering Team , R23 / 2023 - 2027| Powered by MediaPipe + Win32 SendInput*

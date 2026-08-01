@@ -178,6 +178,13 @@ class ModernGestureGUI(ctk.CTk):
         self.sl_pinch.set(32)
         self.sl_pinch.pack(fill="x", pady=(2, 10))
 
+        ctk.CTkLabel(sb, text="Drag Hold Tolerance  (higher = easier hold while moving):",
+                     font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
+        self.sl_drag_tolerance = ctk.CTkSlider(sb, from_=1.2, to=2.5, number_of_steps=26,
+                                              command=self.update_settings, progress_color="#38bdf8")
+        self.sl_drag_tolerance.set(1.75)
+        self.sl_drag_tolerance.pack(fill="x", pady=(2, 10))
+
         ctk.CTkLabel(sb, text="Scroll Speed:",
                      font=ctk.CTkFont(size=11), text_color="#94a3b8").pack(anchor="w")
         self.sl_scroll = ctk.CTkSlider(sb, from_=0.5, to=5.0, number_of_steps=45,
@@ -209,8 +216,8 @@ class ModernGestureGUI(ctk.CTk):
             "☝ 1 Finger (Index)   → Move Cursor\n"
             "✌ 2 Fingers (V-Sign)  → Left Click\n"
             "🤟 3 Fingers Extended → Right Click\n"
-            "🤏 Quick Pinch (<0.25s)→ Double Click (Open App/Folder)\n"
-            "🤏 Pinch & Hold (>0.25s)→ Drag & Drop (Open fingers to Drop)\n"
+            "👍 Thumbs Up Pose     → Double Click (Open App/Folder)\n"
+            "🤏 Pinch & Hold       → Drag & Drop (Spread fingers to Drop)\n"
             "🤙 Pinky Extended     → Close Window (Alt+F4)\n"
             "🖐 Open Palm (5 Fing) → Scroll Up/Down\n"
             "🤘 Rock Sign (Index+Pinky)→ Zoom In (Move Up) / Zoom Out (Move Down)\n"
@@ -252,11 +259,12 @@ class ModernGestureGUI(ctk.CTk):
         self.engine.mirror         = bool(self.sw_mirror.get())
         self.engine.enhance_camera = bool(self.sw_clahe.get())
 
-        self.engine.filter.min_cutoff      = self.sl_cutoff.get()
-        self.engine.roi_margin             = self.sl_roi.get()
-        self.engine.click_threshold        = int(self.sl_pinch.get())
-        self.engine.right_click_threshold  = int(self.sl_pinch.get())
-        self.engine.scroll_sensitivity     = self.sl_scroll.get()
+        self.engine.filter.min_cutoff        = self.sl_cutoff.get()
+        self.engine.roi_margin               = self.sl_roi.get()
+        self.engine.click_threshold          = int(self.sl_pinch.get())
+        self.engine.right_click_threshold    = int(self.sl_pinch.get())
+        self.engine.drag_release_multiplier  = float(self.sl_drag_tolerance.get())
+        self.engine.scroll_sensitivity       = self.sl_scroll.get()
 
     def toggle_engine(self):
         self.engine.enabled = not self.engine.enabled
