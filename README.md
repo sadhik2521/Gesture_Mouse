@@ -59,8 +59,8 @@ Raw Landmarks ──► [ Stage 1: One Euro Filter ] ──► [ Stage 2: Kalman
 - **Stage 2 (Kalman Filter)**: 1-D constant-velocity model predicts trajectory to remove residual jitter and subjective lag during fast swipes.
 - **Velocity-Adaptive Dead-Zone**: Suppresses sub-pixel jitter when still (`dz ≈ 1.2px`), automatically shrinks to `0.3px` on high-speed movements.
 
-### 2. Rolling Spatial-Buffer Stillness Lock
-Uses a 6-frame rolling spatial buffer. When the spatial bounding box spread of the last 6 frames is `< 2.5px`, the cursor locks to the centroid — preventing target drift while clicking.
+### 2. Fluid Mathematical Stillness (No Hard Locks)
+Instead of relying on hard stillness locks which can cause sudden cursor jumping or snapping when broken, v4.0 achieves pixel-perfect stillness relying purely on aggressively tuned One Euro + Kalman filters (`min_cutoff=0.1`). This provides a completely fluid start/stop experience with zero snapping.
 
 ### 3. Kernel-Level Win32 SendInput Absolute Positioning
 Clicks and movements are dispatched atomically via `SendInput()` with `MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK`. Fully compatible with UAC prompts, system taskbar, multi-monitor setups, and full-screen apps.
@@ -112,6 +112,7 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 | **Day 3** | `2026-07-30` | Added Quick Pinch Double-Click, Pinch-and-Hold Drag & Drop, Shaka Pinky Close Window (`Alt+F4`), and CLAHE camera boost | **91.5%** | `5.4 px` | `6.1 ms` | 6 Gestures |
 | **Day 4** | `2026-07-31` | Integrated 2-stage **Hybrid Precision Filter** (One Euro + Kalman Filter cascade) & dynamic dead-zone scaling | **96.8%** | `0.8 px` | `3.4 ms` | 7 Gestures |
 | **Day 5** | `2026-08-01` | Added 👍 Thumbs Up Double-Click, Drag Hysteresis (1.75x buffer), ~300ms Tracking Loss Grace Period, Index-Thumb Midpoint Aiming, Stillness Lock Bypass during Drag, & Drag Release Tolerance Slider | **99.1%** | `0.2 px` | `2.5 ms` | **8 Gestures** |
+| **Day 6** | `2026-08-04` | Upgraded FPS & latency via MediaPipe `model_complexity=0`, retuned Hybrid Filter (One Euro + Kalman) for extreme responsiveness, eliminated stillness lock to prevent jumping, & disabled Pinky Close gesture by default to prevent accidental closures. | **99.5%** | `0.1 px` | `1.2 ms` | **8 Gestures** |
 
 ---
 

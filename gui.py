@@ -148,7 +148,7 @@ class ModernGestureGUI(ctk.CTk):
         self.sw_drag   = self._switch(sb, "Drag & Drop Hold", True)
         self.sw_scroll = self._switch(sb, "Gesture Scroll", True)
         self.sw_zoom   = self._switch(sb, "Palm Zoom In / Out", True)
-        self.sw_close  = self._switch(sb, "Pinky Close Window (Alt+F4)", True)
+        self.sw_close  = self._switch(sb, "Pinky Close Window (Alt+F4)", False)
         self.sw_mirror = self._switch(sb, "Mirror Camera", True)
         self.sw_clahe  = self._switch(sb, "HD Camera Enhancement (CLAHE)", False)
 

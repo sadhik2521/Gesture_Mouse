@@ -212,12 +212,15 @@ class HybridPrecisionFilter:
 
     def __init__(self, freq: float = 30.0):
         # Stage 1 — One Euro (noise reduction, speed-adaptive)
-        self._oef_x = OneEuroFilter(freq=freq, min_cutoff=0.4, beta=0.3,  dcutoff=1.0)
-        self._oef_y = OneEuroFilter(freq=freq, min_cutoff=0.4, beta=0.3,  dcutoff=1.0)
+        # Lower min_cutoff for better stillness, higher dcutoff to react to speed changes faster.
+        # beta is scaled for pixel-coordinates (0.01 * 1000px/s = 10Hz cutoff).
+        self._oef_x = OneEuroFilter(freq=freq, min_cutoff=0.1, beta=0.02, dcutoff=5.0)
+        self._oef_y = OneEuroFilter(freq=freq, min_cutoff=0.1, beta=0.02, dcutoff=5.0)
 
         # Stage 2 — Kalman (residual jitter + micro-lag reduction)
-        self._kf_x  = KalmanFilter1D(process_noise=5e-3, measurement_noise=0.3)
-        self._kf_y  = KalmanFilter1D(process_noise=5e-3, measurement_noise=0.3)
+        # Increase process noise and decrease measurement noise for higher responsiveness (less lag).
+        self._kf_x  = KalmanFilter1D(process_noise=1e-1, measurement_noise=0.05)
+        self._kf_y  = KalmanFilter1D(process_noise=1e-1, measurement_noise=0.05)
 
         self._last_t = None
 
@@ -394,9 +397,9 @@ class GestureEngine:
         self.hands    = self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=1,
-            model_complexity=1,         # upgraded from 0 → 1 for better landmark accuracy
+            model_complexity=0,         # downgraded from 1 → 0 for significantly lower latency and higher FPS
             min_detection_confidence=0.65,
-            min_tracking_confidence=0.60,
+            min_tracking_confidence=0.65,
         )
         self.mp_draw = mp.solutions.drawing_utils
 
@@ -572,29 +575,11 @@ class GestureEngine:
             screen_x, screen_y = self.filter.filter(norm_x, norm_y)
 
             # ── Cursor stillness lock ──────────────────────────────────────
-            # Bypass stillness lock during drag so slow deliberate drag moves remain 100% fluid & responsive
-            if self.mouse.is_dragging or self.is_pinched:
-                self._locked = False
-                self._still_buf.clear()
-            else:
-                self._still_buf.append((screen_x, screen_y))
-                if len(self._still_buf) > self._still_buf_size:
-                    self._still_buf.pop(0)
-
-                if len(self._still_buf) == self._still_buf_size:
-                    xs = [p[0] for p in self._still_buf]
-                    ys = [p[1] for p in self._still_buf]
-                    spread = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
-                    if spread < 2.5:
-                        # Hand is genuinely stationary — lock to centroid for precision
-                        self._locked = True
-                        self._lock_x = sum(xs) / len(xs)
-                        self._lock_y = sum(ys) / len(ys)
-                    else:
-                        self._locked = False
-
-            final_x = self._lock_x if self._locked else screen_x
-            final_y = self._lock_y if self._locked else screen_y
+            # Bypass stillness lock entirely. Hard locks cause sudden jumps when breaking out.
+            # We rely on the aggressively tuned One Euro + Kalman filters (min_cutoff=0.1) for stillness.
+            self._locked = False
+            final_x = screen_x
+            final_y = screen_y
             self.last_valid_drag_pos = (final_x, final_y)
 
             # ── Move cursor ───────────────────────────────────────────────
