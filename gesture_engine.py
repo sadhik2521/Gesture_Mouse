@@ -229,6 +229,15 @@ class HybridPrecisionFilter:
         self._last_fx        = None
         self._last_fy        = None
 
+    @property
+    def min_cutoff(self):
+        return self._oef_x.min_cutoff
+
+    @min_cutoff.setter
+    def min_cutoff(self, value):
+        self._oef_x.min_cutoff = value
+        self._oef_y.min_cutoff = value
+
     def filter(self, x: float, y: float) -> tuple[float, float]:
         now = time.perf_counter()
         dt  = (now - self._last_t) if self._last_t is not None else 1/30
@@ -379,6 +388,7 @@ class GestureEngine:
         self.enable_scroll  = True
         self.enable_zoom    = True
         self.enable_close   = True
+        self.enable_dwell   = False     # Dwell-click — off by default
         self.enhance_camera = False     # CLAHE — off by default (toggle in panel if needed)
         self.mirror         = True
 
@@ -440,7 +450,51 @@ class GestureEngine:
         self._still_buf        = []       # rolling window of last N positions
         self._still_buf_size   = 6        # size of the circular buffer
 
+        # ── Dwell Click (hover-to-click) ───────────────────────────────────
+        self._dwell_x          = 0.0      # anchor screen X
+        self._dwell_y          = 0.0      # anchor screen Y
+        self._dwell_start      = 0.0      # time when cursor settled on anchor
+        self._dwell_active     = False    # True while cursor is within dwell radius
+        self._dwell_radius     = 50.0     # max drift in screen-px before resetting (50px = forgiving of hand tremor)
+        self._dwell_duration   = 3.0      # seconds to hold before auto-click
+        self._dwell_fired      = False    # prevents repeat-firing until cursor moves away
+        self._dwell_slide      = 0.08     # how fast anchor follows hand (0=frozen, 1=instant)
+
+        # ── Gesture debounce counters ──────────────────────────────────────
+        # Prevents accidental single-frame gesture detections from firing clicks
+        # (e.g. middle finger briefly flicking up while reaching for minimize button)
+        self._lclick_frames    = 0        # consecutive frames V-sign has been seen
+        self._rclick_frames    = 0        # consecutive frames 3-finger has been seen
+        self._click_debounce   = 5        # frames required before click fires (~80ms @ 60fps)
+
     # ── Drawing helpers ────────────────────────────────────────────────────
+
+    def _draw_dwell_ring(self, frame, cx, cy, progress, w, h):
+        """
+        Draw a circular countdown ring around the index fingertip on the camera feed.
+        progress: 0.0 → 1.0 (fraction of dwell time elapsed)
+        cx, cy: position in camera-frame pixel coordinates
+        """
+        radius = 28
+        thickness = 3
+        # Background ring (dark grey)
+        cv2.circle(frame, (cx, cy), radius, (60, 60, 60), thickness, cv2.LINE_AA)
+        # Progress arc — sweeps clockwise from top
+        angle = int(progress * 360)
+        if angle > 0:
+            # Green → Yellow → Orange as it fills up
+            if progress < 0.5:
+                color = (0, 255, 100)     # green
+            elif progress < 0.8:
+                color = (0, 230, 255)     # yellow
+            else:
+                color = (0, 140, 255)     # orange
+            cv2.ellipse(frame, (cx, cy), (radius, radius),
+                        -90, 0, angle, color, thickness + 1, cv2.LINE_AA)
+        # Percentage text
+        pct_text = f"{int(progress * 100)}%"
+        cv2.putText(frame, pct_text, (cx - 14, cy + radius + 16),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (200, 200, 200), 1, cv2.LINE_AA)
 
     def _draw_roi_box(self, frame, rx1, ry1, rx2, ry2, hand_in_roi):
         color      = (0, 255, 140) if hand_in_roi else (255, 160, 0)
@@ -582,10 +636,69 @@ class GestureEngine:
             final_y = screen_y
             self.last_valid_drag_pos = (final_x, final_y)
 
+            # ── Dwell Click (hover-to-click) ──────────────────────────────
+            if self.enable_dwell and self.enable_cursor and not all_folded:
+                now_dwell = time.perf_counter()
+                drift = math.hypot(final_x - self._dwell_x, final_y - self._dwell_y)
+
+                if not self._dwell_active:
+                    # First frame with dwell enabled — plant anchor at current position
+                    self._dwell_x      = final_x
+                    self._dwell_y      = final_y
+                    self._dwell_start  = now_dwell
+                    self._dwell_active = True
+                    self._dwell_fired  = False
+
+                elif drift > self._dwell_radius:
+                    # Cursor moved too far — hard reset anchor and timer
+                    self._dwell_x      = final_x
+                    self._dwell_y      = final_y
+                    self._dwell_start  = now_dwell
+                    self._dwell_fired  = False
+
+                else:
+                    if not self._dwell_fired:
+                        elapsed  = now_dwell - self._dwell_start
+                        progress = min(1.0, elapsed / self._dwell_duration)
+
+                        # When just starting, let anchor slide slightly toward current pos
+                        # to absorb minor tremor. But once we're past 30% (~1 second), 
+                        # FREEZE the anchor so it doesn't wander off tiny buttons!
+                        if progress <= 0.3:
+                            self._dwell_x += self._dwell_slide * (final_x - self._dwell_x)
+                            self._dwell_y += self._dwell_slide * (final_y - self._dwell_y)
+                        else:
+                            # MAGNETIC SNAP: lock cursor exactly to the frozen anchor
+                            final_x = self._dwell_x
+                            final_y = self._dwell_y
+
+                        # Draw countdown ring on camera feed at fingertip
+                        self._draw_dwell_ring(frame, ctrl_x, ctrl_y, progress, w, h)
+
+                        if progress >= 1.0:
+                            # Dwell time reached — perform left click!
+                            done = self.mouse.left_click()
+                            if done:
+                                self.active_gesture = "DWELL CLICK"
+                                print(f"[GESTURE]: DWELL CLICK (held {self._dwell_duration:.1f}s)")
+                                cv2.putText(frame, "DWELL CLICK!", (40, 55),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
+                            self._dwell_fired = True
+                        else:
+                            # Show dwell label while waiting
+                            cv2.putText(frame, f"DWELL {int(progress * 100)}%", (40, h - 50),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.50, (200, 200, 200), 1, cv2.LINE_AA)
+            else:
+                # Dwell disabled or hand folded — reset state fully
+                self._dwell_active = False
+                self._dwell_fired  = False
+
             # ── Move cursor ───────────────────────────────────────────────
             if self.enable_cursor and not all_folded:
                 self.mouse.move_to(final_x, final_y)
-                self.active_gesture = "MOVING"
+                if self.active_gesture != "DWELL CLICK":
+                    self.active_gesture = "MOVING"
+
 
             # ── Pinch distances with Hysteresis (normalized to hand scale) ──
             dist_L = math.hypot(x_idx - x_thumb, y_idx - y_thumb)  # Index ↔ Thumb
@@ -707,23 +820,35 @@ class GestureEngine:
             elif index_ext and middle_ext and ring_ext and not pinky_ext and not is_left_pinched and self.enable_click:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
-                done = self.mouse.right_click()
-                if done:
-                    self.active_gesture = "RIGHT CLICK"
-                    print(f"[GESTURE]: {self.active_gesture}")
-                    cv2.putText(frame, "RIGHT CLICK (3 Fingers)", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 60, 0), 2, cv2.LINE_AA)
+                self._lclick_frames = 0   # reset left-click counter
+                self._rclick_frames += 1
+                if self._rclick_frames >= self._click_debounce:
+                    done = self.mouse.right_click()
+                    if done:
+                        self.active_gesture = "RIGHT CLICK"
+                        print(f"[GESTURE]: {self.active_gesture}")
+                        cv2.putText(frame, "RIGHT CLICK (3 Fingers)", (40, 55),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 60, 0), 2, cv2.LINE_AA)
+                else:
+                    cv2.putText(frame, f"RIGHT CLICK... ({self._rclick_frames}/{self._click_debounce})", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 0), 1, cv2.LINE_AA)
 
             # --- GESTURE 6: LEFT CLICK (2 Fingers Only: Index + Middle, Ring FOLDED / V-Sign) ---
             elif index_ext and middle_ext and not ring_ext and not is_left_pinched and self.enable_click:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
-                done = self.mouse.left_click()
-                if done:
-                    self.active_gesture = "LEFT CLICK"
-                    print(f"[GESTURE]: {self.active_gesture}")
-                    cv2.putText(frame, "LEFT CLICK (2 Fingers)", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
+                self._rclick_frames = 0   # reset right-click counter
+                self._lclick_frames += 1
+                if self._lclick_frames >= self._click_debounce:
+                    done = self.mouse.left_click()
+                    if done:
+                        self.active_gesture = "LEFT CLICK"
+                        print(f"[GESTURE]: {self.active_gesture}")
+                        cv2.putText(frame, "LEFT CLICK (2 Fingers)", (40, 55),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
+                else:
+                    cv2.putText(frame, f"LEFT CLICK... ({self._lclick_frames}/{self._click_debounce})", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 255, 120), 1, cv2.LINE_AA)
 
             # --- GESTURE 7: CLOSE ACTIVE WINDOW (Pinky Finger Extended / Shaka) ---
             elif pinky_ext and not index_ext and not middle_ext and not ring_ext and self.enable_close:
@@ -740,6 +865,9 @@ class GestureEngine:
                     self.prev_scroll_y = None
                 if not is_zoom_pose:
                     self.prev_zoom_y = None
+                # Reset click debounce counters when gesture clears
+                self._lclick_frames = 0
+                self._rclick_frames = 0
 
                 # Release pinch logic (Drop)
                 if self.is_pinched:

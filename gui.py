@@ -149,6 +149,7 @@ class ModernGestureGUI(ctk.CTk):
         self.sw_scroll = self._switch(sb, "Gesture Scroll", True)
         self.sw_zoom   = self._switch(sb, "Palm Zoom In / Out", True)
         self.sw_close  = self._switch(sb, "Pinky Close Window (Alt+F4)", False)
+        self.sw_dwell  = self._switch(sb, "Dwell Click (Hover 3s = Click)", False)
         self.sw_mirror = self._switch(sb, "Mirror Camera", True)
         self.sw_clahe  = self._switch(sb, "HD Camera Enhancement (CLAHE)", False)
 
@@ -256,6 +257,7 @@ class ModernGestureGUI(ctk.CTk):
         self.engine.enable_scroll  = bool(self.sw_scroll.get())
         self.engine.enable_zoom    = bool(self.sw_zoom.get())
         self.engine.enable_close   = bool(self.sw_close.get())
+        self.engine.enable_dwell   = bool(self.sw_dwell.get())
         self.engine.mirror         = bool(self.sw_mirror.get())
         self.engine.enhance_camera = bool(self.sw_clahe.get())
 
@@ -316,13 +318,14 @@ class ModernGestureGUI(ctk.CTk):
             ah = self.camera_stream.actual_height
             self.cam_res_label.configure(text=f"Resolution: {aw}×{ah}  |  Target: 1280×720")
 
-            # Convert & display — LANCZOS for high-quality upscaling
-            rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(rgb)
-
+            # Convert & display — Use cv2.resize for high performance
             cw = max(320, self.video_container.winfo_width()  - 8)
             ch = max(240, self.video_container.winfo_height() - 8)
-            img = img.resize((cw, ch), Image.Resampling.LANCZOS)
+            
+            # Faster resize using OpenCV
+            resized = cv2.resize(annotated, (cw, ch), interpolation=cv2.INTER_LINEAR)
+            rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(rgb)
 
             ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(cw, ch))
             self.video_label.configure(image=ctk_img, text="")

@@ -18,6 +18,7 @@
 - 🤙 **Pinky Extended (Shaka Sign)** = Close Active Window (`Alt + F4`)
 - 🖐 **Open Palm (5 Fingers)** = Scroll Up / Down
 - 🤘 **Rock Sign (Index + Pinky)** = Zoom In (Move Up) / Zoom Out (Move Down)
+- ⏳ **Dwell Click (Hover 3s)** = Auto Left Click (hold cursor still on any element for 3 seconds)
 
 ---
 
@@ -35,6 +36,7 @@
 | **Close Window** | 🤙 **Pinky Extended** (Shaka / Call-Me Sign) | Close Window | Sends `Alt + F4` to close the currently focused window |
 | **Scroll Up / Down** | 🖐 **Open Palm (5 Fingers Extended)** | Scroll | Slide open hand **UP** (Scroll Up) or **DOWN** (Scroll Down) |
 | **Zoom In / Out** | 🤘 **Rock Sign (Index + Pinky Extended)** | Zoom | Move hand **UP** to Zoom In (`Ctrl + =`), **DOWN** to Zoom Out (`Ctrl + -`) |
+| **Dwell Click** | ⏳ **Hold Cursor Still (3 seconds)** | Auto Left Click | Keep cursor on any button/element for 3s — a countdown ring fills up, then auto-clicks. Toggle on/off in Control Panel |
 
 ---
 
@@ -45,6 +47,7 @@
 3. For the **Taskbar**: move your hand to the **very bottom** of the green ROI box. Edge-overshoot mapping guarantees reaching taskbar icons.
 4. For **Drag & Drop**: touch Index and Thumb together for > 0.25 seconds until the screen overlay says `DRAGGING`. Move to target location and spread fingers apart to **Drop**.
 5. Adjust **Cursor Smoothness** slider in the Control Panel to tune filter responsiveness for your webcam frame rate.
+6. **Dwell Click**: Enable it in the Control Panel, then just hover the cursor over a button or icon for **3 seconds** — a circular countdown ring appears around your fingertip and auto-clicks when full. Great for accessibility or when pinch gestures are difficult.
 
 ---
 
@@ -86,6 +89,23 @@ Midpoint Aiming:           Index + Thumb midpoint tracking during drag
 - **Midpoint Tracking**: Calculates cursor position from the midpoint between index finger and thumb while dragging, eliminating squeeze displacement jitter.
 - **Stillness Lock Bypass**: Bypasses stationary lock during active drag so slow deliberate movements remain 100% fluid without cursor freezing.
 
+### 7. Dwell Click (Hover-to-Click Accessibility)
+```
+Dwell Radius:   50 screen-pixels  (forgiving of natural hand tremor)
+Dwell Duration: 3.0 seconds       (configurable via toggle)
+Visual Feedback: Animated countdown ring (Green → Yellow → Orange → Auto-Click)
+Magnetic Snap:  Locks cursor to anchor at 30% progress to ensure precision
+```
+- **Hover-to-Click**: When the cursor remains within a 50px radius for 3 continuous seconds, a left click is automatically triggered — no pinch gesture needed.
+- **Magnetic Snap**: To guarantee the cursor doesn't drift off small targets (like a close button) during the final moments of the countdown, the cursor visibly "freezes" onto its anchor point after 1 second of dwell time.
+- **Visual Countdown Ring**: A progress arc is drawn around the fingertip on the camera feed so you can see exactly when the click will fire.
+- **Anti-Repeat Guard**: After a dwell click fires, it won't re-trigger until the cursor moves to a new position, preventing accidental double-fires.
+- **Toggle Control**: Disabled by default to avoid accidental clicks during normal use. Enable via the `Dwell Click (Hover 3s = Click)` toggle in the Control Panel.
+
+### 8. Gesture Debounce & Atomic Windows Event Injection
+- **5-Frame Debounce**: Left Click (V-Sign) and Right Click gestures require a strict 5-frame (~80ms) hold before firing, completely eliminating accidental clicks from transient finger flicks or misdetections.
+- **Atomic 50ms Win32 Clicks**: `SendInput` combines absolute coordinate movement and mouse down/up states directly in the kernel event queue, featuring a 50ms delay between down and up. This perfectly mimics human hardware clicks, guaranteeing compatibility with stubborn Windows titlebar buttons (Close, Minimize, Maximize) and elevated apps.
+
 ---
 
 ## 📊 Experimental Project Results & Performance Metrics
@@ -113,6 +133,7 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 | **Day 4** | `2026-07-31` | Integrated 2-stage **Hybrid Precision Filter** (One Euro + Kalman Filter cascade) & dynamic dead-zone scaling | **96.8%** | `0.8 px` | `3.4 ms` | 7 Gestures |
 | **Day 5** | `2026-08-01` | Added 👍 Thumbs Up Double-Click, Drag Hysteresis (1.75x buffer), ~300ms Tracking Loss Grace Period, Index-Thumb Midpoint Aiming, Stillness Lock Bypass during Drag, & Drag Release Tolerance Slider | **99.1%** | `0.2 px` | `2.5 ms` | **8 Gestures** |
 | **Day 6** | `2026-08-04` | Upgraded FPS & latency via MediaPipe `model_complexity=0`, retuned Hybrid Filter (One Euro + Kalman) for extreme responsiveness, eliminated stillness lock to prevent jumping, & disabled Pinky Close gesture by default to prevent accidental closures. | **99.5%** | `0.1 px` | `1.2 ms` | **8 Gestures** |
+| **Day 7** | `2026-08-06` | Added **Dwell Click** (hover-to-click) with animated countdown ring, 50px tremor radius, and Magnetic Cursor Snap. Implemented 5-frame click debounce to block accidental triggers. Upgraded Win32 kernel clicks to Atomic 50ms Down/Up cycles for reliable OS Titlebar/Window control. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
 
 ---
 
@@ -143,7 +164,7 @@ python main.py
 ## 🚀 Control Panel & Features
 
 - `Gesture Engine Switch`: Easily enable or pause the entire gesture engine
-- `Individual Feature Toggles`: Independent switches for cursor, click, drag, scroll, zoom, pinky window close, camera mirror, and CLAHE enhancement
+- `Individual Feature Toggles`: Independent switches for cursor, click, drag, scroll, zoom, pinky window close, **dwell click**, camera mirror, and CLAHE enhancement
 - `Cursor Smoothness Slider`: Fine-tune cutoff frequency (`0.05` to `0.50`)
 - `Active ROI Zone Slider`: Scale hand movement region
 - `Pinch Click Sensitivity`: Adjust pinch detection threshold

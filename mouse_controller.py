@@ -128,12 +128,17 @@ class FastMouseController:
         now = time.perf_counter()
         if now - self.last_left_click < self.left_cooldown:
             return False
-        # Atomic: move + down + up in one SendInput call
-        self._send_input(
-            self._move_input(self._cur_x, self._cur_y),
-            self._build_mouse_input(MOUSEEVENTF_LEFTDOWN),
-            self._build_mouse_input(MOUSEEVENTF_LEFTUP),
-        )
+            
+        ax, ay = self._pixel_to_abs(self._cur_x, self._cur_y)
+        base_flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
+        
+        # Down at exact coordinate
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
+        # 50ms delay for reliable OS button registration
+        time.sleep(0.05)
+        # Up at exact coordinate
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
+        
         self.last_left_click = now
         return True
 
@@ -142,11 +147,14 @@ class FastMouseController:
         now = time.perf_counter()
         if now - self.last_right_click < self.right_cooldown:
             return False
-        self._send_input(
-            self._move_input(self._cur_x, self._cur_y),
-            self._build_mouse_input(MOUSEEVENTF_RIGHTDOWN),
-            self._build_mouse_input(MOUSEEVENTF_RIGHTUP),
-        )
+            
+        ax, ay = self._pixel_to_abs(self._cur_x, self._cur_y)
+        base_flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
+        
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_RIGHTDOWN, dx=ax, dy=ay))
+        time.sleep(0.05)
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_RIGHTUP, dx=ax, dy=ay))
+        
         self.last_right_click = now
         return True
 
@@ -155,13 +163,18 @@ class FastMouseController:
         now = time.perf_counter()
         if now - self.last_double_click < self.double_cooldown:
             return False
-        self._send_input(
-            self._move_input(self._cur_x, self._cur_y),
-            self._build_mouse_input(MOUSEEVENTF_LEFTDOWN),
-            self._build_mouse_input(MOUSEEVENTF_LEFTUP),
-            self._build_mouse_input(MOUSEEVENTF_LEFTDOWN),
-            self._build_mouse_input(MOUSEEVENTF_LEFTUP),
-        )
+            
+        ax, ay = self._pixel_to_abs(self._cur_x, self._cur_y)
+        base_flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
+        
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
+        time.sleep(0.03)
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
+        time.sleep(0.03)
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
+        time.sleep(0.03)
+        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
+        
         self.last_double_click = now
         self.last_left_click   = now  # prevent accidental single click after
         return True
