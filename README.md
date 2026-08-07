@@ -134,6 +134,7 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 | **Day 5** | `2026-08-01` | Added 👍 Thumbs Up Double-Click, Drag Hysteresis (1.75x buffer), ~300ms Tracking Loss Grace Period, Index-Thumb Midpoint Aiming, Stillness Lock Bypass during Drag, & Drag Release Tolerance Slider | **99.1%** | `0.2 px` | `2.5 ms` | **8 Gestures** |
 | **Day 6** | `2026-08-04` | Upgraded FPS & latency via MediaPipe `model_complexity=0`, retuned Hybrid Filter (One Euro + Kalman) for extreme responsiveness, eliminated stillness lock to prevent jumping, & disabled Pinky Close gesture by default to prevent accidental closures. | **99.5%** | `0.1 px` | `1.2 ms` | **8 Gestures** |
 | **Day 7** | `2026-08-06` | Added **Dwell Click** (hover-to-click) with animated countdown ring, 50px tremor radius, and Magnetic Cursor Snap. Implemented 5-frame click debounce to block accidental triggers. Upgraded Win32 kernel clicks to Atomic 50ms Down/Up cycles for reliable OS Titlebar/Window control. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
+| **Day 8** | `2026-08-07` | **UI Overhaul**: Added a collapsible Control Panel toggled via a new Settings (⚙) icon in the header. Implemented dynamic layout packing to seamlessly share screen space between the HD camera feed and settings menu. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
 
 ---
 
@@ -163,8 +164,9 @@ python main.py
 
 ## 🚀 Control Panel & Features
 
-- `Gesture Engine Switch`: Easily enable or pause the entire gesture engine
-- `Individual Feature Toggles`: Independent switches for cursor, click, drag, scroll, zoom, pinky window close, **dwell click**, camera mirror, and CLAHE enhancement
+- `Collapsible Settings Menu`: Click the **⚙ Settings Icon** in the header to smoothly toggle the Control Panel in and out of view.
+- `Gesture Engine Switch`: Easily enable or pause the entire gesture engine.
+- `Individual Feature Toggles`: Independent switches for cursor, click, drag, scroll, zoom, pinky window close, **dwell click**, camera mirror, and CLAHE enhancement.
 - `Cursor Smoothness Slider`: Fine-tune cutoff frequency (`0.05` to `0.50`)
 - `Active ROI Zone Slider`: Scale hand movement region
 - `Pinch Click Sensitivity`: Adjust pinch detection threshold

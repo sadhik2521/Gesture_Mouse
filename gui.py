@@ -64,6 +64,19 @@ class ModernGestureGUI(ctk.CTk):
         )
         self.power_btn.pack(side="right", padx=20, pady=13)
 
+        self.settings_btn = ctk.CTkButton(
+            hf,
+            text="⚙",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            fg_color="transparent",
+            hover_color="#1e293b",
+            text_color="#94a3b8",
+            width=38, height=36,
+            corner_radius=8,
+            command=self.toggle_settings_panel,
+        )
+        self.settings_btn.pack(side="right", padx=(0, 4), pady=13)
+
     # ── Main layout ────────────────────────────────────────────────────────
 
     def _build_main_layout(self):
@@ -71,8 +84,9 @@ class ModernGestureGUI(ctk.CTk):
         main.pack(fill="both", expand=True, padx=18, pady=16)
 
         # ── Left column: video + metrics ──────────────────────────────────
-        left = ctk.CTkFrame(main, fg_color="#0d1829", corner_radius=12)
-        left.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        self.left_panel = ctk.CTkFrame(main, fg_color="#0d1829", corner_radius=12)
+        self.left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        left = self.left_panel
 
         ctk.CTkLabel(
             left,
@@ -125,17 +139,34 @@ class ModernGestureGUI(ctk.CTk):
         )
         self.status_card.pack(side="right", padx=14, pady=7)
 
-        # ── Right column: settings ────────────────────────────────────────
-        right = ctk.CTkFrame(main, fg_color="#0d1829", corner_radius=12, width=390)
-        right.pack(side="right", fill="both", expand=False, padx=(10, 0))
-        right.pack_propagate(False)
+        # ── Right column: settings (hidden by default) ───────────────────
+        self.right_panel = ctk.CTkFrame(main, fg_color="#0d1829", corner_radius=12, width=390)
+        self.right_panel.pack_propagate(False)
+        self._settings_visible = False
+        right = self.right_panel
+
+        # Panel header with close button
+        panel_header = ctk.CTkFrame(right, fg_color="transparent")
+        panel_header.pack(fill="x", padx=20, pady=(15, 4))
 
         ctk.CTkLabel(
-            right,
-            text="⚙️ CONTROL PANEL",
+            panel_header,
+            text="⚙ CONTROL PANEL",
             font=ctk.CTkFont(size=15, weight="bold"),
             text_color="#f1f5f9",
-        ).pack(anchor="w", padx=20, pady=(15, 8))
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            panel_header,
+            text="✕",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="transparent",
+            hover_color="#1e293b",
+            text_color="#64748b",
+            width=28, height=28,
+            corner_radius=6,
+            command=self.toggle_settings_panel,
+        ).pack(side="right")
 
         sb = ctk.CTkScrollableFrame(right, fg_color="transparent")
         sb.pack(fill="both", expand=True, padx=14, pady=(0, 14))
@@ -267,6 +298,18 @@ class ModernGestureGUI(ctk.CTk):
         self.engine.right_click_threshold    = int(self.sl_pinch.get())
         self.engine.drag_release_multiplier  = float(self.sl_drag_tolerance.get())
         self.engine.scroll_sensitivity       = self.sl_scroll.get()
+
+    def toggle_settings_panel(self):
+        if self._settings_visible:
+            self.right_panel.pack_forget()
+            self._settings_visible = False
+            self.settings_btn.configure(text_color="#94a3b8")
+        else:
+            self.left_panel.pack_forget()
+            self.right_panel.pack(side="right", fill="both", expand=False, padx=(10, 0))
+            self.left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
+            self._settings_visible = True
+            self.settings_btn.configure(text_color="#38bdf8")
 
     def toggle_engine(self):
         self.engine.enabled = not self.engine.enabled
