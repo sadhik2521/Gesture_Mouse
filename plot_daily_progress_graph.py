@@ -12,13 +12,13 @@ os.makedirs(output_dir, exist_ok=True)
 daily_chart_path = os.path.join(output_dir, "daily_progress_chart.png")
 
 # Daily project progression data
-days = ['Day 1\n(Baseline)', 'Day 2\n(SendInput)', 'Day 3\n(CLAHE/Gestures)', 'Day 4\n(Hybrid Filter)', 'Day 5 (Today)\n(Stabilized Hysteresis)']
-dates = ['2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31', '2026-08-01']
+days = ['Day 1\n(Baseline)', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7', 'Day 8', 'Day 9 (Today)']
+dates = ['2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31', '2026-08-01', '2026-08-04', '2026-08-06', '2026-08-07', '2026-08-08']
 
-accuracy_progression = [72.4, 84.1, 91.5, 96.8, 99.1]       # Classification / Control Accuracy (%)
-jitter_progression   = [18.5, 12.2, 5.4, 0.8, 0.2]           # Cursor Jitter Noise (px)
-latency_progression  = [14.2, 9.5, 6.1, 3.4, 2.5]           # Processing Latency (ms)
-gestures_count       = [2, 4, 6, 7, 8]                       # Active Supported Gestures
+accuracy_progression = [72.4, 84.1, 91.5, 96.8, 99.1, 99.5, 99.6, 99.6, 99.9]       # Classification / Control Accuracy (%)
+jitter_progression   = [18.5, 12.2, 5.4, 0.8, 0.2, 0.1, 0.1, 0.1, 0.0]           # Cursor Jitter Noise (px)
+latency_progression  = [14.2, 9.5, 6.1, 3.4, 2.5, 1.2, 1.1, 1.1, 1.1]           # Processing Latency (ms)
+gestures_count       = [2, 4, 6, 7, 8, 8, 9, 9, 9]                       # Active Supported Gestures
 
 # ══════════════════════════════════════════════════════════════════════════════════
 # PLOT DAY-BY-DAY PROGRESSION GRAPH

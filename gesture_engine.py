@@ -5,6 +5,7 @@ import numpy as np
 import math
 import time
 import threading
+import uiautomation as auto
 from mouse_controller import FastMouseController
 
 
@@ -388,7 +389,8 @@ class GestureEngine:
         self.enable_scroll  = True
         self.enable_zoom    = True
         self.enable_close   = True
-        self.enable_dwell   = False     # Dwell-click — off by default
+        self.enable_dwell   = True      # Used as fallback toggle for UI Hover
+        self.enable_ui_hover_click = True
         self.enhance_camera = False     # CLAHE — off by default (toggle in panel if needed)
         self.mirror         = True
 
@@ -449,23 +451,22 @@ class GestureEngine:
         self._locked           = False
         self._still_buf        = []       # rolling window of last N positions
         self._still_buf_size   = 6        # size of the circular buffer
+        self._pos_history      = []       # keeps last 10 cursor positions to fix folding dip
 
-        # ── Dwell Click (hover-to-click) ───────────────────────────────────
-        self._dwell_x          = 0.0      # anchor screen X
-        self._dwell_y          = 0.0      # anchor screen Y
-        self._dwell_start      = 0.0      # time when cursor settled on anchor
-        self._dwell_active     = False    # True while cursor is within dwell radius
-        self._dwell_radius     = 50.0     # max drift in screen-px before resetting (50px = forgiving of hand tremor)
-        self._dwell_duration   = 3.0      # seconds to hold before auto-click
-        self._dwell_fired      = False    # prevents repeat-firing until cursor moves away
-        self._dwell_slide      = 0.08     # how fast anchor follows hand (0=frozen, 1=instant)
+        # ── Smart UI Hover Auto-Click ──────────────────────────────────────
+        self._hover_element_id = None     # Identifier for the UI element under cursor
+        self._hover_start_time = 0.0      # time when cursor settled on the element
+        self._hover_duration   = 3.0      # seconds to hold before auto-click
+        self._hover_fired      = False    # prevents repeat-firing until cursor moves away
 
         # ── Gesture debounce counters ──────────────────────────────────────
         # Prevents accidental single-frame gesture detections from firing clicks
         # (e.g. middle finger briefly flicking up while reaching for minimize button)
         self._lclick_frames    = 0        # consecutive frames V-sign has been seen
         self._rclick_frames    = 0        # consecutive frames 3-finger has been seen
+        self._close_frames     = 0        # consecutive frames pinky has been extended
         self._click_debounce   = 5        # frames required before click fires (~80ms @ 60fps)
+        self._close_debounce   = 15       # require holding Close Window gesture longer (~250ms) to prevent accidents
 
     # ── Drawing helpers ────────────────────────────────────────────────────
 
@@ -617,6 +618,7 @@ class GestureEngine:
 
             all_folded = not (index_ext or middle_ext or ring_ext or pinky_ext)
             all_open   = index_ext and middle_ext and ring_ext and pinky_ext
+            three_folded = not index_ext and not middle_ext and not ring_ext
 
             # ── Screen mapping with edge overshoot ────────────────────────
             sw, sh = self.mouse.screen_w, self.mouse.screen_h
@@ -632,71 +634,66 @@ class GestureEngine:
             # Bypass stillness lock entirely. Hard locks cause sudden jumps when breaking out.
             # We rely on the aggressively tuned One Euro + Kalman filters (min_cutoff=0.1) for stillness.
             self._locked = False
-            final_x = screen_x
-            final_y = screen_y
+            
+            # Freeze cursor if making a fist (prevent dip when curling fingers for Thumbs Up / Close Window)
+            if three_folded and len(self._pos_history) == 10:
+                final_x, final_y = self._pos_history[0]
+            else:
+                final_x = screen_x
+                final_y = screen_y
+                self._pos_history.append((final_x, final_y))
+                if len(self._pos_history) > 10:
+                    self._pos_history.pop(0)
+
             self.last_valid_drag_pos = (final_x, final_y)
 
-            # ── Dwell Click (hover-to-click) ──────────────────────────────
-            if self.enable_dwell and self.enable_cursor and not all_folded:
-                now_dwell = time.perf_counter()
-                drift = math.hypot(final_x - self._dwell_x, final_y - self._dwell_y)
+            # ── Smart UI Hover Auto-Click ──────────────────────────────────────
+            # Uses uiautomation to detect if the cursor stays within the same UI component
+            if getattr(self, 'enable_ui_hover_click', self.enable_dwell) and self.enable_cursor and not all_folded:
+                try:
+                    control = auto.ControlFromPoint(int(final_x), int(final_y))
+                    rect = control.BoundingRectangle
+                    # Uniquely identify control by position and name
+                    ctrl_id = (rect.left, rect.top, rect.right, rect.bottom, control.Name)
+                    now_hover = time.perf_counter()
 
-                if not self._dwell_active:
-                    # First frame with dwell enabled — plant anchor at current position
-                    self._dwell_x      = final_x
-                    self._dwell_y      = final_y
-                    self._dwell_start  = now_dwell
-                    self._dwell_active = True
-                    self._dwell_fired  = False
+                    if self._hover_element_id != ctrl_id:
+                        # Component changed or first time tracking
+                        self._hover_element_id = ctrl_id
+                        self._hover_start_time = now_hover
+                        self._hover_fired = False
+                    else:
+                        # Still on the same UI component
+                        if not self._hover_fired:
+                            elapsed = now_hover - self._hover_start_time
+                            progress = min(1.0, elapsed / self._hover_duration)
 
-                elif drift > self._dwell_radius:
-                    # Cursor moved too far — hard reset anchor and timer
-                    self._dwell_x      = final_x
-                    self._dwell_y      = final_y
-                    self._dwell_start  = now_dwell
-                    self._dwell_fired  = False
+                            # Draw countdown ring on camera feed at fingertip
+                            self._draw_dwell_ring(frame, ctrl_x, ctrl_y, progress, w, h)
 
-                else:
-                    if not self._dwell_fired:
-                        elapsed  = now_dwell - self._dwell_start
-                        progress = min(1.0, elapsed / self._dwell_duration)
-
-                        # When just starting, let anchor slide slightly toward current pos
-                        # to absorb minor tremor. But once we're past 30% (~1 second), 
-                        # FREEZE the anchor so it doesn't wander off tiny buttons!
-                        if progress <= 0.3:
-                            self._dwell_x += self._dwell_slide * (final_x - self._dwell_x)
-                            self._dwell_y += self._dwell_slide * (final_y - self._dwell_y)
-                        else:
-                            # MAGNETIC SNAP: lock cursor exactly to the frozen anchor
-                            final_x = self._dwell_x
-                            final_y = self._dwell_y
-
-                        # Draw countdown ring on camera feed at fingertip
-                        self._draw_dwell_ring(frame, ctrl_x, ctrl_y, progress, w, h)
-
-                        if progress >= 1.0:
-                            # Dwell time reached — perform left click!
-                            done = self.mouse.left_click()
-                            if done:
-                                self.active_gesture = "DWELL CLICK"
-                                print(f"[GESTURE]: DWELL CLICK (held {self._dwell_duration:.1f}s)")
-                                cv2.putText(frame, "DWELL CLICK!", (40, 55),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
-                            self._dwell_fired = True
-                        else:
-                            # Show dwell label while waiting
-                            cv2.putText(frame, f"DWELL {int(progress * 100)}%", (40, h - 50),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.50, (200, 200, 200), 1, cv2.LINE_AA)
+                            if progress >= 1.0:
+                                done = self.mouse.left_click()
+                                if done:
+                                    self.active_gesture = "AUTO UI CLICK"
+                                    name_label = control.Name if control.Name else "Element"
+                                    print(f"[GESTURE]: AUTO UI CLICK on '{name_label}' (held {self._hover_duration:.1f}s)")
+                                    cv2.putText(frame, "UI AUTO CLICK!", (40, 55),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
+                                self._hover_fired = True
+                            else:
+                                cv2.putText(frame, f"HOVER {int(progress * 100)}%", (40, h - 50),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.50, (200, 200, 200), 1, cv2.LINE_AA)
+                except Exception as e:
+                    self._hover_element_id = None
+                    self._hover_fired = False
             else:
-                # Dwell disabled or hand folded — reset state fully
-                self._dwell_active = False
-                self._dwell_fired  = False
+                self._hover_element_id = None
+                self._hover_fired = False
 
             # ── Move cursor ───────────────────────────────────────────────
             if self.enable_cursor and not all_folded:
                 self.mouse.move_to(final_x, final_y)
-                if self.active_gesture != "DWELL CLICK":
+                if self.active_gesture != "AUTO UI CLICK":
                     self.active_gesture = "MOVING"
 
 
@@ -742,12 +739,14 @@ class GestureEngine:
 
             four_fingers   = index_ext and middle_ext and ring_ext and pinky_ext
             four_folded    = not index_ext and not middle_ext and not ring_ext and not pinky_ext
+            
+            # Use four_folded for thumbs up so it strictly requires pinky to be folded.
             thumb_up_pose  = four_folded and (y_thumb < y_wrist) and (y_thumb < y_idx_mcp) and (math.hypot(x_thumb - x_wrist, y_thumb - y_wrist) > 0.85 * hand_scale)
             is_scroll_pose = four_fingers
             is_zoom_pose   = index_ext and pinky_ext and not middle_ext and not ring_ext
 
             # --- GESTURE 1: SCROLL UP / DOWN (Open Palm 5 Fingers) ---
-            if is_scroll_pose and not is_left_pinched and self.enable_scroll:
+            if is_scroll_pose and self.enable_scroll:
                 self.prev_zoom_y = None
                 if self.prev_scroll_y is not None:
                     dy = y_idx - self.prev_scroll_y
@@ -763,7 +762,7 @@ class GestureEngine:
                 self.prev_scroll_y = y_idx
 
             # --- GESTURE 2: ZOOM IN / ZOOM OUT (Rock Sign 🤘 Move UP / DOWN) ---
-            elif is_zoom_pose and not is_left_pinched and self.enable_zoom:
+            elif is_zoom_pose and self.enable_zoom:
                 self.prev_scroll_y = None
                 if self.prev_zoom_y is not None:
                     dy = y_idx - self.prev_zoom_y
@@ -785,9 +784,10 @@ class GestureEngine:
                     self.prev_zoom_y = y_idx
 
             # --- GESTURE 3: DOUBLE CLICK (Thumbs Up Pose 👍) ---
-            elif thumb_up_pose and not is_left_pinched and self.enable_click:
+            elif thumb_up_pose and self.enable_click:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
+                
                 done = self.mouse.double_click()
                 if done:
                     self.active_gesture = "DOUBLE CLICK"
@@ -817,10 +817,11 @@ class GestureEngine:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
 
             # --- GESTURE 5: RIGHT CLICK (3 Fingers Only: Index + Middle + Ring, Pinky FOLDED) ---
-            elif index_ext and middle_ext and ring_ext and not pinky_ext and not is_left_pinched and self.enable_click:
+            elif index_ext and middle_ext and ring_ext and not pinky_ext and self.enable_click:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
-                self._lclick_frames = 0   # reset left-click counter
+                self._lclick_frames = 0
+                self._close_frames  = 0
                 self._rclick_frames += 1
                 if self._rclick_frames >= self._click_debounce:
                     done = self.mouse.right_click()
@@ -834,10 +835,11 @@ class GestureEngine:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 0), 1, cv2.LINE_AA)
 
             # --- GESTURE 6: LEFT CLICK (2 Fingers Only: Index + Middle, Ring FOLDED / V-Sign) ---
-            elif index_ext and middle_ext and not ring_ext and not is_left_pinched and self.enable_click:
+            elif index_ext and middle_ext and not ring_ext and self.enable_click:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
-                self._rclick_frames = 0   # reset right-click counter
+                self._rclick_frames = 0
+                self._close_frames  = 0
                 self._lclick_frames += 1
                 if self._lclick_frames >= self._click_debounce:
                     done = self.mouse.left_click()
@@ -854,13 +856,24 @@ class GestureEngine:
             elif pinky_ext and not index_ext and not middle_ext and not ring_ext and self.enable_close:
                 self.prev_scroll_y = None
                 self.prev_zoom_y   = None
-                done = self.mouse.close_window()
-                if done:
-                    self.active_gesture = "CLOSE WINDOW"
-                    print(f"[GESTURE]: {self.active_gesture}")
-                    cv2.putText(frame, "CLOSE WINDOW (Alt+F4)", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2, cv2.LINE_AA)
+                self._lclick_frames = 0
+                self._rclick_frames = 0
+                self._close_frames += 1
+                
+                if self._close_frames >= self._close_debounce:
+                    done = self.mouse.close_window()
+                    if done:
+                        self.active_gesture = "CLOSE WINDOW"
+                        print(f"[GESTURE]: {self.active_gesture}")
+                        cv2.putText(frame, "CLOSE WINDOW (Alt+F4)", (40, 55),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2, cv2.LINE_AA)
+                else:
+                    cv2.putText(frame, f"CLOSE WINDOW... ({self._close_frames}/{self._close_debounce})", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1, cv2.LINE_AA)
             else:
+                self._lclick_frames = 0
+                self._rclick_frames = 0
+                self._close_frames  = 0
                 if not is_scroll_pose:
                     self.prev_scroll_y = None
                 if not is_zoom_pose:

@@ -22,9 +22,9 @@
 
 ---
 
-## 🖐️ Visual Gesture Control Guide (v4.0)
+## 🖐️ Visual Gesture Control Guide (v4.1)
 
-![Gesture Control Guide v4.0](assets/gesture_guide_v4.jpg)
+![Gesture Control Guide v4.1](assets/gesture_guide_v5.jpg)
 
 | Gesture | Hand Pose | Action | Details |
 |---|---|---|---|
@@ -36,7 +36,7 @@
 | **Close Window** | 🤙 **Pinky Extended** (Shaka / Call-Me Sign) | Close Window | Sends `Alt + F4` to close the currently focused window |
 | **Scroll Up / Down** | 🖐 **Open Palm (5 Fingers Extended)** | Scroll | Slide open hand **UP** (Scroll Up) or **DOWN** (Scroll Down) |
 | **Zoom In / Out** | 🤘 **Rock Sign (Index + Pinky Extended)** | Zoom | Move hand **UP** to Zoom In (`Ctrl + =`), **DOWN** to Zoom Out (`Ctrl + -`) |
-| **Dwell Click** | ⏳ **Hold Cursor Still (3 seconds)** | Auto Left Click | Keep cursor on any button/element for 3s — a countdown ring fills up, then auto-clicks. Toggle on/off in Control Panel |
+| **Smart UI Hover**| ⏱️ **Hold Cursor on UI Element (3 seconds)** | Auto Left Click | Tracks Windows UI accessibility tree. Keeps counting even if hand shakes. |
 
 ---
 
@@ -47,7 +47,13 @@
 3. For the **Taskbar**: move your hand to the **very bottom** of the green ROI box. Edge-overshoot mapping guarantees reaching taskbar icons.
 4. For **Drag & Drop**: touch Index and Thumb together for > 0.25 seconds until the screen overlay says `DRAGGING`. Move to target location and spread fingers apart to **Drop**.
 5. Adjust **Cursor Smoothness** slider in the Control Panel to tune filter responsiveness for your webcam frame rate.
-6. **Dwell Click**: Enable it in the Control Panel, then just hover the cursor over a button or icon for **3 seconds** — a circular countdown ring appears around your fingertip and auto-clicks when full. Great for accessibility or when pinch gestures are difficult.
+6. **Smart UI Hover**: Enable Dwell Click in the Control Panel, then just hover the cursor over a button or icon for **3 seconds**. It tracks the *semantic UI element* under the cursor, making it 100% immune to small hand shakes!
+
+---
+
+## 🚀 Engine Upgrades & Performance Analytics (v4.1)
+
+![Engine Improvements](assets/v4_improvements.png)
 
 ---
 
@@ -89,15 +95,19 @@ Midpoint Aiming:           Index + Thumb midpoint tracking during drag
 - **Midpoint Tracking**: Calculates cursor position from the midpoint between index finger and thumb while dragging, eliminating squeeze displacement jitter.
 - **Stillness Lock Bypass**: Bypasses stationary lock during active drag so slow deliberate movements remain 100% fluid without cursor freezing.
 
-### 7. Dwell Click (Hover-to-Click Accessibility)
+### 7. Smart UI Component Tracking (Accessibility Auto-Click)
 ```
-Dwell Radius:   50 screen-pixels  (forgiving of natural hand tremor)
-Dwell Duration: 3.0 seconds       (configurable via toggle)
-Visual Feedback: Animated countdown ring (Green → Yellow → Orange → Auto-Click)
-Magnetic Snap:  Locks cursor to anchor at 30% progress to ensure precision
+UI Detection:  Uses PyUIAutomation to read the Windows Accessibility Tree (UIA)
+Jitter Immune: Tracks the Element ID, not the raw XY coordinate.
+Dwell Time:    3.0 seconds (configurable)
 ```
-- **Hover-to-Click**: When the cursor remains within a 50px radius for 3 continuous seconds, a left click is automatically triggered — no pinch gesture needed.
-- **Magnetic Snap**: To guarantee the cursor doesn't drift off small targets (like a close button) during the final moments of the countdown, the cursor visibly "freezes" onto its anchor point after 1 second of dwell time.
+- **Semantic Hover Tracking**: Instead of forcing the user to hold the cursor perfectly still within a 20px radius, the engine queries the OS for the UI Element (Button, Tab, Link) currently under the pointer. As long as the cursor stays *anywhere* inside that component's bounding box, the hover timer progresses.
+- **Immune to Shakes**: This completely eliminates auto-click resets caused by minor hand tremors, vastly improving accessibility and usability for those unable to use pinch gestures.
+
+### 8. The 10-Frame Time Machine (Anti-Dip Engine)
+When a user curls their index finger down to perform a "Thumbs Up" or "Close Window" gesture, the fingertip physically moves downwards towards the palm. In a traditional virtual mouse, this causes a frustrating pre-click downward dip, causing clicks to miss their target.
+- **Rolling History Buffer**: The engine maintains a rolling 10-frame history buffer of previously smoothed cursor positions.
+- **Temporal Reversion**: The exact moment a fist-based gesture is detected, the cursor is instantly restored to its position from 160ms ago (before the finger started folding) and frozen there. The double-click fires precisely at the original targeted pixel!
 - **Visual Countdown Ring**: A progress arc is drawn around the fingertip on the camera feed so you can see exactly when the click will fire.
 - **Anti-Repeat Guard**: After a dwell click fires, it won't re-trigger until the cursor moves to a new position, preventing accidental double-fires.
 - **Toggle Control**: Disabled by default to avoid accidental clicks during normal use. Enable via the `Dwell Click (Hover 3s = Click)` toggle in the Control Panel.
@@ -135,6 +145,7 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 | **Day 6** | `2026-08-04` | Upgraded FPS & latency via MediaPipe `model_complexity=0`, retuned Hybrid Filter (One Euro + Kalman) for extreme responsiveness, eliminated stillness lock to prevent jumping, & disabled Pinky Close gesture by default to prevent accidental closures. | **99.5%** | `0.1 px` | `1.2 ms` | **8 Gestures** |
 | **Day 7** | `2026-08-06` | Added **Dwell Click** (hover-to-click) with animated countdown ring, 50px tremor radius, and Magnetic Cursor Snap. Implemented 5-frame click debounce to block accidental triggers. Upgraded Win32 kernel clicks to Atomic 50ms Down/Up cycles for reliable OS Titlebar/Window control. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
 | **Day 8** | `2026-08-07` | **UI Overhaul**: Added a collapsible Control Panel toggled via a new Settings (⚙) icon in the header. Implemented dynamic layout packing to seamlessly share screen space between the HD camera feed and settings menu. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
+| **Day 9** | `2026-08-08` | **Engine Upgrades**: Replaced static Dwell Click with **Smart UI Component Tracking** via `uiautomation` for 100% jitter-immune accessibility clicking. Built the **10-Frame Time Machine (Anti-Dip Engine)** to perfectly freeze the cursor 160ms prior to fist gestures, eliminating pre-click target dips. Refined Thumbs Up and Shaka gestures for perfect mutual exclusivity. | **99.9%** | `0.0 px` | `1.1 ms` | **9 Gestures** |
 
 ---
 

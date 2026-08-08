@@ -28,18 +28,27 @@ def generate_gesture_guide():
         {"icon": "☝️", "name": "Move Cursor", "pose": "1 Finger (Index)", "action": "Moves mouse cursor across screen with Hybrid Precision Filter", "color": (56, 189, 248)},
         {"icon": "✌️", "name": "Left Click", "pose": "2 Fingers (V-Sign)", "action": "Single Left Click at target cursor position", "color": (52, 211, 153)},
         {"icon": "🤟", "name": "Right Click", "pose": "3 Fingers Extended", "action": "Right Click context menu", "color": (251, 146, 60)},
-        {"icon": "👍", "name": "Double Click", "pose": "Thumbs Up Pose", "action": "Show Thumbs Up to double click (open files & folders)", "color": (250, 204, 21)},
+        {"icon": "👍", "name": "Double Click", "pose": "Thumbs Up Pose", "action": "Show Thumbs Up to double click (open files & apps)", "color": (250, 204, 21)},
         {"icon": "🤏", "name": "Drag & Drop", "pose": "Pinch & Hold", "action": "Pinch & hold to drag. Open fingers wide to Drop", "color": (168, 85, 247)},
-        {"icon": "🤙", "name": "Close Window", "pose": "Pinky Extended (Shaka)", "action": "Closes current active window (Alt + F4)", "color": (244, 63, 94)},
+        {"icon": "🤙", "name": "Close Window", "pose": "Pinky Extended (Shaka)", "action": "Closes current active window (Hold ~250ms)", "color": (244, 63, 94)},
         {"icon": "🖐", "name": "Scroll Up / Down", "pose": "Open Palm (5 Fingers)", "action": "Slide hand UP (Scroll Up) or DOWN (Scroll Down)", "color": (56, 189, 248)},
-        {"icon": "🤘", "name": "Zoom In / Out", "pose": "Rock Sign (Index + Pinky)", "action": "Move hand UP (Zoom In Ctrl+=), DOWN (Zoom Out Ctrl+-)", "color": (236, 72, 153)},
+        {"icon": "🤘", "name": "Zoom In / Out", "pose": "Rock Sign (Index + Pinky)", "action": "Move hand UP (Zoom In), DOWN (Zoom Out)", "color": (236, 72, 153)},
+        {"icon": "⏱️", "name": "Smart UI Hover", "pose": "Point & Hold (UI)", "action": "Hover over a UI element for 3s to Auto-Click", "color": (163, 230, 53)},
     ]
 
-    # Grid layout: 2 rows of 4 cards
-    cols = 4
-    card_w, card_h = 285, 310
-    start_x, start_y = 30, 110
-    gap_x, gap_y = 22, 22
+    # Grid layout: 3 rows of 3 cards
+    cols = 3
+    card_w, card_h = 380, 220
+    start_x, start_y = 50, 100
+    gap_x, gap_y = 20, 20
+    
+    # Increase image height to fit 3 rows
+    height = 100 + 3 * (card_h + gap_y) + 20
+    img = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([(0, 0), (width, 80)], fill=(15, 34, 64))
+    draw.text((30, 20), "⚡ AI GESTURE MOUSE v4.0 — COMPLETE GESTURE GUIDE", fill=(56, 189, 248), font=title_font)
+    draw.text((30, 56), "Ultra-Intuitive Touchless Control Scheme with Smart UI Tracking", fill=(148, 163, 184), font=sub_font)
 
     for i, g in enumerate(gestures):
         r = i // cols
@@ -66,7 +75,7 @@ def generate_gesture_guide():
         lines = []
         curr_line = ""
         for word in words:
-            if len(curr_line + " " + word) <= 28:
+            if len(curr_line + " " + word) <= 35:
                 curr_line += (" " if curr_line else "") + word
             else:
                 lines.append(curr_line)
@@ -84,7 +93,7 @@ def generate_gesture_guide():
         draw.text((x + 32, y + card_h - 38), f"Action: {g['name']}", fill=g['color'], font=card_tag)
 
     # Save image
-    out_path = os.path.join("assets", "gesture_guide_v4.jpg")
+    out_path = os.path.join("assets", "gesture_guide_v5.jpg")
     img.save(out_path, quality=95)
     print(f"Generated {out_path} successfully!")
 
