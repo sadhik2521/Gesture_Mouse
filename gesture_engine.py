@@ -211,22 +211,22 @@ class HybridPrecisionFilter:
     webcam signal.
     """
 
-    def __init__(self, freq: float = 30.0):
+    def __init__(self, freq: float = 60.0):
         # Stage 1 — One Euro (noise reduction, speed-adaptive)
-        # Lower min_cutoff for better stillness, higher dcutoff to react to speed changes faster.
-        # beta is scaled for pixel-coordinates (0.01 * 1000px/s = 10Hz cutoff).
-        self._oef_x = OneEuroFilter(freq=freq, min_cutoff=0.1, beta=0.02, dcutoff=5.0)
-        self._oef_y = OneEuroFilter(freq=freq, min_cutoff=0.1, beta=0.02, dcutoff=5.0)
+        # min_cutoff=0.5 is the classic sweet-spot for 60 Hz pointer tracking.
+        # beta=0.07 keeps fast swipes responsive without over-smoothing.
+        self._oef_x = OneEuroFilter(freq=freq, min_cutoff=0.5, beta=0.07, dcutoff=5.0)
+        self._oef_y = OneEuroFilter(freq=freq, min_cutoff=0.5, beta=0.07, dcutoff=5.0)
 
         # Stage 2 — Kalman (residual jitter + micro-lag reduction)
-        # Increase process noise and decrease measurement noise for higher responsiveness (less lag).
-        self._kf_x  = KalmanFilter1D(process_noise=1e-1, measurement_noise=0.05)
-        self._kf_y  = KalmanFilter1D(process_noise=1e-1, measurement_noise=0.05)
+        # Lower measurement_noise for tighter convergence; process_noise stays high for responsiveness.
+        self._kf_x  = KalmanFilter1D(process_noise=1e-1, measurement_noise=0.03)
+        self._kf_y  = KalmanFilter1D(process_noise=1e-1, measurement_noise=0.03)
 
         self._last_t = None
 
-        # Deadzone: adaptive — shrinks when hand moves fast so cursor tracks exactly
-        self.deadzone_px     = 1.2    # base dead-zone in screen-pixels
+        # Deadzone: adaptive — 2.0 px when still, shrinks to ~0.3 px during fast swipe
+        self.deadzone_px     = 2.0    # base dead-zone in screen-pixels
         self._last_fx        = None
         self._last_fy        = None
 
@@ -285,24 +285,34 @@ class CameraStream:
     """
 
     def __init__(self, src=0, width=640, height=480, fps=60):
-        self.cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
-        if not self.cap.isOpened():
+        # DroidCam (and most physical webcams) are DirectShow devices on Windows.
+        # Try CAP_DSHOW first for ALL integer sources — it is the correct backend.
+        # Fall back to MSMF then bare (auto) only if DSHOW fails.
+        if isinstance(src, int):
+            self.cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
+            if not self.cap.isOpened():
+                self.cap.release()
+                self.cap = cv2.VideoCapture(src, cv2.CAP_MSMF)
+            if not self.cap.isOpened():
+                self.cap.release()
+                self.cap = cv2.VideoCapture(src)   # last resort: auto backend
+        else:
+            # IP URL or file path — use default backend
             self.cap = cv2.VideoCapture(src)
 
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.cap.set(cv2.CAP_PROP_FPS, fps)
+        if self.cap.isOpened():
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            self.cap.set(cv2.CAP_PROP_FPS, fps)
+            self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+            self.cap.set(cv2.CAP_PROP_BRIGHTNESS, 128)
+            # Warmup frames so auto-exposure stabilises
+            for _ in range(5):
+                self.cap.read()
 
-        # Reset auto-exposure to automatic mode.
-        # Diagnostic confirmed: 0.75 = auto (brightness ~160) on this camera.
-        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
-        # Reset brightness to default (was stuck at 150 from a previous session)
-        self.cap.set(cv2.CAP_PROP_BRIGHTNESS, 128)
-
-        # Read warmup frames so auto-exposure stabilizes before first real frame
-        for _ in range(10):
-            self.cap.read()
         self.ret, self.frame = self.cap.read()
+        if not self.ret:
+            print(f"[ERROR]: Camera {src} failed to capture frames.")
         self.running = True
         self.lock    = threading.Lock()
 
@@ -378,7 +388,7 @@ class GestureEngine:
         self.mouse  = mouse_controller
 
         # ── Hybrid precision filter (One Euro + Kalman cascade) ────────────
-        self.filter = HybridPrecisionFilter(freq=30.0)
+        self.filter = HybridPrecisionFilter(freq=60.0)  # match 60 Hz processing loop
         self.clahe  = CLAHEEnhancer(clip_limit=2.5)
 
         # ── Feature toggles ────────────────────────────────────────────────
@@ -389,29 +399,26 @@ class GestureEngine:
         self.enable_scroll  = True
         self.enable_zoom    = True
         self.enable_close   = True
-        self.enable_dwell   = True      # Used as fallback toggle for UI Hover
+        self.enable_dwell   = True
         self.enable_ui_hover_click = True
-        self.enhance_camera = False     # CLAHE — off by default (toggle in panel if needed)
+        self.enhance_camera = False
         self.mirror         = True
 
         # ── Tuning parameters ──────────────────────────────────────────────
-        # Smaller margin = larger usable hand zone = easier to reach edges/taskbar
-        self.roi_margin         = 0.08   # 8% — gives full-screen reach comfortably
-        self.click_threshold    = 32     # pinch distance (pixels) for left click
-        self.right_click_threshold = 32
-        self.scroll_sensitivity = 2.0
-        # Edge overshoot: push mapping slightly past screen boundary so cursor
-        # reaches 0 and screen_h (taskbar row) reliably
-        self.edge_overshoot     = 0.02   # 2% extra mapping on each side
+        self.roi_margin              = 0.08
+        self.click_threshold       = 32     # pinch distance (px) relative to hand scale
+        self.drag_release_multiplier = 1.75   # 1.75x distance hysteresis while dragging
+        self.scroll_sensitivity      = 2.0
+        self.edge_overshoot          = 0.02
 
         # ── MediaPipe ──────────────────────────────────────────────────────
         self.mp_hands = mp.solutions.hands
         self.hands    = self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=1,
-            model_complexity=0,         # downgraded from 1 → 0 for significantly lower latency and higher FPS
-            min_detection_confidence=0.65,
-            min_tracking_confidence=0.65,
+            model_complexity=0,
+            min_detection_confidence=0.75,  # higher = fewer false positives
+            min_tracking_confidence=0.60,   # slightly lower = better lock-on once detected
         )
         self.mp_draw = mp.solutions.drawing_utils
 
@@ -422,51 +429,51 @@ class GestureEngine:
         self.hand_detected   = False
         self.hand_confidence = 0.0
 
-        # ── State tracking ─────────────────────────────────────────────────
-        self.pinch_start_time  = 0.0
-        self.is_pinched        = False
-        self.prev_scroll_y     = None
-        self.prev_zoom_y       = None
+        # ── Drag & Drop state tracking ─────────────────────────────────────
+        self.pinch_start_time     = 0.0
+        self.is_pinched           = False
+        self.drag_loss_frames     = 0
+        self.max_drag_loss_frames = 10     # ~300ms dropout protection before dropping
+        self.last_valid_drag_pos  = None
 
-        # ── Drag & Drop Hysteresis & Grace Period ──────────────────────────
-        self.drag_release_multiplier = 1.75    # 1.75x distance threshold when holding pinch/drag
-        self.drag_loss_frames       = 0       # frames since hand tracking was lost during drag
-        self.max_drag_loss_frames   = 10      # ~300ms dropout protection before releasing drag
-        self.last_valid_drag_pos    = None    # last (screen_x, screen_y) position during drag
+        # ── Scroll / Zoom state ────────────────────────────────────────────
+        self.prev_scroll_y = None
+        self.prev_zoom_y   = None
 
-        # Double-click: deferred single-click approach
-        # On first quick release we do NOT fire immediately — we wait up to
-        # _double_click_gap seconds. If a second quick pinch-release arrives
-        # in that window → double-click. Otherwise → single click.
-        self._pending_click       = False   # True = a first click is waiting
-        self._pending_click_time  = 0.0     # when the first release happened
-        self._double_click_gap    = 0.40    # max gap between two pinches (seconds)
-
-        # Cursor-still lock: when hand barely moves, lock cursor to prevent drift
-        # Uses a circular buffer to detect true stillness (not just one-frame pause)
-        self._still_frames     = 0
-        self._still_threshold  = 6        # frames of stillness before locking (was 8)
-        self._lock_x           = 0.0
-        self._lock_y           = 0.0
-        self._locked           = False
-        self._still_buf        = []       # rolling window of last N positions
-        self._still_buf_size   = 6        # size of the circular buffer
-        self._pos_history      = []       # keeps last 10 cursor positions to fix folding dip
+        # ── Cursor position history (freeze during click poses) ────────────
+        self._locked      = False
+        self._pos_history = []
 
         # ── Smart UI Hover Auto-Click ──────────────────────────────────────
-        self._hover_element_id = None     # Identifier for the UI element under cursor
-        self._hover_start_time = 0.0      # time when cursor settled on the element
-        self._hover_duration   = 3.0      # seconds to hold before auto-click
-        self._hover_fired      = False    # prevents repeat-firing until cursor moves away
+        self._hover_element_id     = None
+        self._hover_start_time     = 0.0
+        self._hover_duration       = 3.0
+        self._hover_fired          = False
+        self._hover_check_interval = 0.25
+        self._last_hover_check     = 0.0
+        self._cached_ctrl_id       = None
 
         # ── Gesture debounce counters ──────────────────────────────────────
-        # Prevents accidental single-frame gesture detections from firing clicks
-        # (e.g. middle finger briefly flicking up while reaching for minimize button)
-        self._lclick_frames    = 0        # consecutive frames V-sign has been seen
-        self._rclick_frames    = 0        # consecutive frames 3-finger has been seen
-        self._close_frames     = 0        # consecutive frames pinky has been extended
-        self._click_debounce   = 5        # frames required before click fires (~80ms @ 60fps)
-        self._close_debounce   = 15       # require holding Close Window gesture longer (~250ms) to prevent accidents
+        self._lclick_frames  = 0   # consecutive frames index-bend held
+        self._rclick_frames  = 0   # consecutive frames Peace-Sign held
+        self._dclick_frames  = 0   # consecutive frames Thumb-only held
+        self._close_frames   = 0   # consecutive frames Pinky-only held
+        self._click_debounce = 6   # ~100 ms @ 60 fps (tunable via GUI)
+        self._close_debounce = 18  # ~300 ms — longer to avoid accidental Alt+F4
+
+        # ── Index-finger bend left-click (edge-triggered, fires ONCE per bend) ─
+        # The gesture fires on the FALLING EDGE only: straight → bent transition.
+        # _idx_was_straight tracks whether the finger was up last frame so we
+        # don't re-fire while the finger stays curled down.
+        self._idx_was_straight  = True   # True when index was extended last frame
+        self._lclick_armed      = False  # True once bend is confirmed; reset on straighten
+        self._lclick_cooldown_t = 0.0   # time of last fired click (extra guard)
+        self._lclick_cooldown_s = 0.40  # 400 ms minimum between bend-clicks
+
+        # ── EMA position history for anti-jitter cursor reference ──────────
+        self._ema_x = None
+        self._ema_y = None
+        self._ema_alpha = 0.35   # lower = smoother history reference
 
     # ── Drawing helpers ────────────────────────────────────────────────────
 
@@ -589,36 +596,107 @@ class GestureEngine:
             x_ring_mcp,   y_ring_mcp   = lm[13]
             x_pinky,      y_pinky      = lm[20]
             x_pinky_mcp,  y_pinky_mcp  = lm[17]
+            x_thumb_cmc,  y_thumb_cmc  = lm[1]
 
             # Hand scale (wrist → middle MCP)
             hand_scale = max(30.0, math.hypot(x_mid_mcp - x_wrist, y_mid_mcp - y_wrist))
 
+            # ── Pinch distances with Hysteresis (normalized to hand scale) ──
+            dist_L = math.hypot(x_idx - x_thumb, y_idx - y_thumb)
+            start_thresh = self.click_threshold / 100.0 * hand_scale
+
+            if self.is_pinched or self.mouse.is_dragging:
+                release_thresh = start_thresh * self.drag_release_multiplier
+                is_left_pinched = dist_L < release_thresh
+            else:
+                is_left_pinched = dist_L < start_thresh
+
             # ── Cursor control position ────────────────────────────────────
-            # Use Index-Thumb midpoint during pinch/drag to eliminate squeeze displacement, else Index tip
+            # During drag: use Index-Thumb midpoint to eliminate squeeze displacement.
+            # During normal tracking: use Index PIP joint (lm[6]) — far more stable
+            # than the raw fingertip (lm[8]) which is the jitteriest landmark.
+            x_idx_pip, y_idx_pip = lm[6]   # Index PIP joint (proximal interphalangeal)
             if self.is_pinched or self.mouse.is_dragging:
                 ctrl_x = int((x_idx + x_thumb) / 2)
                 ctrl_y = int((y_idx + y_thumb) / 2)
             else:
-                ctrl_x = x_idx
-                ctrl_y = y_idx
+                ctrl_x = x_idx_pip
+                ctrl_y = y_idx_pip
 
             hand_in_roi = (rx1 <= ctrl_x <= rx2 and ry1 <= ctrl_y <= ry2)
 
-            # Finger extension detection
-            def extended(tip_xy, mcp_xy, wrist_xy, ratio=1.2):
+            # ── Finger extension detection ─────────────────────────────────
+            # Two-criterion check: (1) tip distance from wrist is > ratio*MCP distance,
+            # AND (2) tip is above (lower Y value than) the MCP in image coords.
+            # This handles bent-wrist poses that fool a single distance ratio check.
+            # Reduced ratio to 1.15 to make middle finger much more forgiving to foreshortening!
+            def extended(tip_xy, mcp_xy, wrist_xy, ratio=1.05):
                 d_tip  = math.hypot(tip_xy[0] - wrist_xy[0], tip_xy[1] - wrist_xy[1])
                 d_base = math.hypot(mcp_xy[0] - wrist_xy[0], mcp_xy[1] - wrist_xy[1])
-                return d_tip > ratio * d_base
+                dist_ok = d_tip > ratio * d_base
+                # Tip should be farther from wrist than its own MCP
+                tip_far = d_tip > d_base * 1.05
+                return dist_ok and tip_far
 
             wrist_xy    = (x_wrist, y_wrist)
             index_ext   = extended((x_idx,   y_idx),   (x_idx_mcp,   y_idx_mcp),   wrist_xy)
             middle_ext  = extended((x_mid,   y_mid),   (x_mid_mcp,   y_mid_mcp),   wrist_xy)
             ring_ext    = extended((x_ring,  y_ring),  (x_ring_mcp,  y_ring_mcp),  wrist_xy)
             pinky_ext   = extended((x_pinky, y_pinky), (x_pinky_mcp, y_pinky_mcp), wrist_xy)
+            
+            # Thumb extension: measure distance from thumb TIP to INDEX MCP (base of index finger).
+            # When just pointing with index, thumb rests near the palm/index base → small distance.
+            # When deliberately spread into L-shape, thumb moves far from index base → large distance.
+            # This is much more reliable than CMC-to-tip which is always large due to thumb anatomy.
+            thumb_to_idx_base = math.hypot(x_thumb - x_idx_mcp, y_thumb - y_idx_mcp)
+            thumb_ext = thumb_to_idx_base > (hand_scale * 0.75)
 
-            all_folded = not (index_ext or middle_ext or ring_ext or pinky_ext)
-            all_open   = index_ext and middle_ext and ring_ext and pinky_ext
-            three_folded = not index_ext and not middle_ext and not ring_ext
+            all_folded   = not (index_ext or middle_ext or ring_ext or pinky_ext)
+            all_open     = index_ext and middle_ext and ring_ext and pinky_ext
+
+            # ── Index-finger bend detection ────────────────────────────────
+            # We use the robust `extended()` check which compares distance to the wrist.
+            # When the finger curls, `index_ext` becomes False.
+            index_is_bent = not index_ext
+
+            # Gesture poses — computed BEFORE cursor movement so cursor can
+            # be frozen immediately on click/close poses.
+
+            # ── Stricter "clearly extended" check ──────────────────────────
+            # ratio=1.45 (vs 1.05 for regular extended()) so that naturally-raised
+            # but actually-folded fingers don't falsely block gesture poses.
+            def clearly_extended(tip_xy, mcp_xy, wrist_xy, ratio=1.45):
+                d_tip  = math.hypot(tip_xy[0] - wrist_xy[0], tip_xy[1] - wrist_xy[1])
+                d_base = math.hypot(mcp_xy[0] - wrist_xy[0], mcp_xy[1] - wrist_xy[1])
+                return d_tip > ratio * d_base and d_tip > d_base * 1.05
+
+            index_clearly_ext  = clearly_extended((x_idx,   y_idx),   (x_idx_mcp,   y_idx_mcp),   wrist_xy)
+            middle_clearly_ext = clearly_extended((x_mid,   y_mid),   (x_mid_mcp,   y_mid_mcp),   wrist_xy)
+            ring_clearly_ext   = clearly_extended((x_ring,  y_ring),  (x_ring_mcp,  y_ring_mcp),  wrist_xy)
+            pinky_clearly_ext  = clearly_extended((x_pinky, y_pinky), (x_pinky_mcp, y_pinky_mcp), wrist_xy)
+
+            # CLOSE WINDOW: pinky only (shaka sign)
+            # Uses clearly_extended for blocking — partially raised fingers won't prevent close.
+            is_close_pose  = pinky_ext and not index_clearly_ext and not middle_clearly_ext and not ring_clearly_ext
+
+            # LEFT CLICK: Index + Middle (Peace Sign ✌️).
+            # Only ring/pinky that are CLEARLY extended (ratio 1.45) block this gesture.
+            is_lclick_pose = index_ext and middle_ext and not ring_clearly_ext and not pinky_clearly_ext
+
+            # RIGHT CLICK: Thumb + Index L-Shape / Gun 👉.
+            # Same logic — only clearly-extended fingers suppress it.
+            is_rclick_pose = thumb_ext and index_ext and not middle_ext and not ring_clearly_ext and not pinky_clearly_ext
+            
+            # DOUBLE CLICK: Thumb Only.
+            # Index & Middle must be folded so it doesn't overlap with Right/Left click.
+            is_dclick_pose = thumb_ext and not index_ext and not middle_ext and not all_open
+
+            # STRICT TRACKING: Cursor ONLY moves if ONLY the index finger is extended.
+            # This completely solves the jitter because the moment you start opening 
+            # another finger for a click, tracking is frozen!
+            is_strict_tracking = index_ext and not middle_ext and not ring_ext and not pinky_ext and not thumb_ext
+
+            four_folded = all_folded
 
             # ── Screen mapping with edge overshoot ────────────────────────
             sw, sh = self.mouse.screen_w, self.mouse.screen_h
@@ -631,16 +709,36 @@ class GestureEngine:
             screen_x, screen_y = self.filter.filter(norm_x, norm_y)
 
             # ── Cursor stillness lock ──────────────────────────────────────
-            # Bypass stillness lock entirely. Hard locks cause sudden jumps when breaking out.
-            # We rely on the aggressively tuned One Euro + Kalman filters (min_cutoff=0.1) for stillness.
             self._locked = False
+
+            # Freeze cursor during click poses to prevent jitter/jumps, UNLESS dragging
+            is_frozen = all_folded or is_close_pose or is_lclick_pose or is_rclick_pose or is_dclick_pose
             
-            # Freeze cursor if making a fist (prevent dip when curling fingers for Thumbs Up / Close Window)
-            if three_folded and len(self._pos_history) == 10:
-                final_x, final_y = self._pos_history[0]
+            if is_frozen and self._pos_history:
+                final_x, final_y = self._pos_history[-1]
             else:
-                final_x = screen_x
-                final_y = screen_y
+                # EMA smoothing over recent filtered positions for anti-jitter reference.
+                # This prevents single-frame snaps when transitioning between gestures.
+                if self._ema_x is None:
+                    self._ema_x, self._ema_y = screen_x, screen_y
+                else:
+                    self._ema_x = self._ema_alpha * screen_x + (1.0 - self._ema_alpha) * self._ema_x
+                    self._ema_y = self._ema_alpha * screen_y + (1.0 - self._ema_alpha) * self._ema_y
+
+                # ── Movement Threshold (Anti-Jitter Anchor) ───────────────
+                # If movement is tiny (camera noise / hand tremor), lock the cursor completely.
+                # It only breaks the lock if the smoothed position moves > 2.0 pixels away.
+                if self._pos_history:
+                    last_x, last_y = self._pos_history[-1]
+                    dist = math.hypot(self._ema_x - last_x, self._ema_y - last_y)
+                    if dist < 2.0:
+                        final_x, final_y = last_x, last_y
+                    else:
+                        final_x, final_y = self._ema_x, self._ema_y
+                else:
+                    final_x = self._ema_x
+                    final_y = self._ema_y
+                    
                 self._pos_history.append((final_x, final_y))
                 if len(self._pos_history) > 10:
                     self._pos_history.pop(0)
@@ -648,34 +746,40 @@ class GestureEngine:
             self.last_valid_drag_pos = (final_x, final_y)
 
             # ── Smart UI Hover Auto-Click ──────────────────────────────────────
-            # Uses uiautomation to detect if the cursor stays within the same UI component
             if getattr(self, 'enable_ui_hover_click', self.enable_dwell) and self.enable_cursor and not all_folded:
-                try:
-                    control = auto.ControlFromPoint(int(final_x), int(final_y))
-                    rect = control.BoundingRectangle
-                    # Uniquely identify control by position and name
-                    ctrl_id = (rect.left, rect.top, rect.right, rect.bottom, control.Name)
-                    now_hover = time.perf_counter()
+                now_hover = time.perf_counter()
+                if now_hover - self._last_hover_check >= self._hover_check_interval:
+                    self._last_hover_check = now_hover
+                    try:
+                        control = auto.ControlFromPoint(int(final_x), int(final_y))
+                        rect = control.BoundingRectangle
+                        self._cached_ctrl_id = (rect.left, rect.top, rect.right, rect.bottom, control.Name)
+                    except Exception:
+                        self._cached_ctrl_id = None
 
+                ctrl_id = self._cached_ctrl_id
+                if ctrl_id is not None:
+                    now_hover = time.perf_counter()
                     if self._hover_element_id != ctrl_id:
-                        # Component changed or first time tracking
                         self._hover_element_id = ctrl_id
                         self._hover_start_time = now_hover
                         self._hover_fired = False
                     else:
-                        # Still on the same UI component
                         if not self._hover_fired:
                             elapsed = now_hover - self._hover_start_time
                             progress = min(1.0, elapsed / self._hover_duration)
 
-                            # Draw countdown ring on camera feed at fingertip
                             self._draw_dwell_ring(frame, ctrl_x, ctrl_y, progress, w, h)
 
                             if progress >= 1.0:
+                                try:
+                                    control = auto.ControlFromPoint(int(final_x), int(final_y))
+                                    name_label = control.Name if control.Name else "Element"
+                                except Exception:
+                                    name_label = "Element"
                                 done = self.mouse.left_click()
                                 if done:
                                     self.active_gesture = "AUTO UI CLICK"
-                                    name_label = control.Name if control.Name else "Element"
                                     print(f"[GESTURE]: AUTO UI CLICK on '{name_label}' (held {self._hover_duration:.1f}s)")
                                     cv2.putText(frame, "UI AUTO CLICK!", (40, 55),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
@@ -683,71 +787,43 @@ class GestureEngine:
                             else:
                                 cv2.putText(frame, f"HOVER {int(progress * 100)}%", (40, h - 50),
                                             cv2.FONT_HERSHEY_SIMPLEX, 0.50, (200, 200, 200), 1, cv2.LINE_AA)
-                except Exception as e:
-                    self._hover_element_id = None
-                    self._hover_fired = False
             else:
                 self._hover_element_id = None
                 self._hover_fired = False
+                self._cached_ctrl_id = None
 
             # ── Move cursor ───────────────────────────────────────────────
-            if self.enable_cursor and not all_folded:
+            # The cursor ONLY MOVES if the user is in strict tracking mode 
+            # (only index finger up). If they open another finger or pinch, it freezes.
+            if self.enable_cursor and (is_strict_tracking or self.is_pinched):
                 self.mouse.move_to(final_x, final_y)
                 if self.active_gesture != "AUTO UI CLICK":
                     self.active_gesture = "MOVING"
 
-
-            # ── Pinch distances with Hysteresis (normalized to hand scale) ──
-            dist_L = math.hypot(x_idx - x_thumb, y_idx - y_thumb)  # Index ↔ Thumb
-            dist_R = math.hypot(x_mid - x_thumb, y_mid - y_thumb)  # Middle ↔ Thumb
-
-            start_thresh = self.click_threshold / 100.0 * hand_scale
-
-            # Hysteresis: If already pinched or dragging, require fingers to spread significantly wider to release
-            if self.is_pinched or self.mouse.is_dragging:
-                release_thresh = start_thresh * self.drag_release_multiplier
-                is_left_pinched = dist_L < release_thresh
-            else:
-                is_left_pinched = dist_L < start_thresh
-
-            is_right_pinched = dist_R < start_thresh and middle_ext and not index_ext
-
-            # Visual touch lines & markers
+            # ── Visual Pinch line & Fingertip marker ──────────────────────
             line_color = (0, 255, 255) if self.mouse.is_dragging else ((0, 255, 80) if is_left_pinched else (0, 100, 255))
             line_thick = 3 if self.mouse.is_dragging else 2
             cv2.line(frame, (x_idx, y_idx), (x_thumb, y_thumb), line_color, line_thick, cv2.LINE_AA)
 
-            if middle_ext:
-                cv2.line(frame, (x_mid, y_mid), (x_thumb, y_thumb),
-                         (255, 60, 0) if is_right_pinched else (80, 80, 80), 1, cv2.LINE_AA)
-            # Index fingertip & pinch center markers
             cv2.circle(frame, (x_idx, y_idx), 8, (255, 0, 220), cv2.FILLED, cv2.LINE_AA)
-            cv2.circle(frame, (x_idx, y_idx), 8, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.circle(frame, (x_idx, y_idx), 8, (255, 255, 255), 1,         cv2.LINE_AA)
+
             if self.mouse.is_dragging:
                 mid_x = int((x_idx + x_thumb) / 2)
                 mid_y = int((y_idx + y_thumb) / 2)
                 cv2.circle(frame, (mid_x, mid_y), 12, (0, 255, 255), 2, cv2.LINE_AA)
 
-            # ═══ GESTURE LOGIC ════════════════════════════════════════════════════════════
-            # 1. SCROLL:       🖐 Open Palm (5 Fingers Extended) -> Pure Scrolling (NO Clicks!)
-            # 2. ZOOM IN/OUT:  🤘 Rock Sign (Index + Pinky UP) -> Move UP (Zoom In) / Move DOWN (Zoom Out)
-            # 3. PINCH & HOLD: 🤏 Touch Index + Thumb > 0.25s -> DRAG & DROP (Open fingers to drop!)
-            # 4. QUICK PINCH:  🤏 Touch Index + Thumb < 0.25s -> DOUBLE CLICK (Open App/Folder)
-            # 5. RIGHT CLICK:  🤟 3 Fingers Only (Index + Middle + Ring UP, Pinky FOLDED)
-            # 6. LEFT CLICK:   ✌️ 2 Fingers Only (Index + Middle UP, Ring FOLDED / V-Sign)
-            # 7. CLOSE WINDOW: 🤙 Pinky Extended Only (Shaka Sign) -> Alt+F4
-
-            four_fingers   = index_ext and middle_ext and ring_ext and pinky_ext
-            four_folded    = not index_ext and not middle_ext and not ring_ext and not pinky_ext
-            
-            # Use four_folded for thumbs up so it strictly requires pinky to be folded.
-            thumb_up_pose  = four_folded and (y_thumb < y_wrist) and (y_thumb < y_idx_mcp) and (math.hypot(x_thumb - x_wrist, y_thumb - y_wrist) > 0.85 * hand_scale)
-            is_scroll_pose = four_fingers
+            # ═══ GESTURE LOGIC ═══════════════════════════════════════════════
+            is_scroll_pose = index_ext and middle_ext and ring_ext and pinky_ext
             is_zoom_pose   = index_ext and pinky_ext and not middle_ext and not ring_ext
+            # Note: is_rclick_pose (peace sign) already computed above before cursor freeze
 
-            # --- GESTURE 1: SCROLL UP / DOWN (Open Palm 5 Fingers) ---
+            # --- GESTURE 1: SCROLL UP / DOWN (🖐 Open Palm) ---
             if is_scroll_pose and self.enable_scroll:
                 self.prev_zoom_y = None
+                self._lclick_frames = 0
+                self._rclick_frames = 0
+                self._close_frames  = 0
                 if self.prev_scroll_y is not None:
                     dy = y_idx - self.prev_scroll_y
                     if abs(dy) > 4:
@@ -761,9 +837,12 @@ class GestureEngine:
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 240, 0), 2, cv2.LINE_AA)
                 self.prev_scroll_y = y_idx
 
-            # --- GESTURE 2: ZOOM IN / ZOOM OUT (Rock Sign 🤘 Move UP / DOWN) ---
+            # --- GESTURE 2: ZOOM IN / OUT (🤘 Rock Sign) ---
             elif is_zoom_pose and self.enable_zoom:
-                self.prev_scroll_y = None
+                self.prev_scroll_y  = None
+                self._lclick_frames = 0
+                self._rclick_frames = 0
+                self._close_frames  = 0
                 if self.prev_zoom_y is not None:
                     dy = y_idx - self.prev_zoom_y
                     if abs(dy) > 8:
@@ -777,100 +856,135 @@ class GestureEngine:
                             if done:
                                 self.active_gesture = "ZOOM OUT"
                                 print(f"[GESTURE]: {self.active_gesture}")
-                        cv2.putText(frame, f"ROCK {self.active_gesture}", (40, 55),
+                        cv2.putText(frame, f"ROCK 🤘 {self.active_gesture}", (40, 55),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 255), 2, cv2.LINE_AA)
                         self.prev_zoom_y = y_idx
                 else:
                     self.prev_zoom_y = y_idx
 
-            # --- GESTURE 3: DOUBLE CLICK (Thumbs Up Pose 👍) ---
-            elif thumb_up_pose and self.enable_click:
-                self.prev_scroll_y = None
-                self.prev_zoom_y   = None
-                
-                done = self.mouse.double_click()
-                if done:
-                    self.active_gesture = "DOUBLE CLICK"
-                    print(f"[GESTURE]: {self.active_gesture}")
-                    cv2.putText(frame, "DOUBLE CLICK (Thumbs Up 👍)", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
-
-            # --- GESTURE 4: DRAG & DROP (Pinch & Hold Index + Thumb) ---
-            elif is_left_pinched:
-                self.prev_scroll_y = None
-                self.prev_zoom_y   = None
-                if not self.is_pinched:
-                    self.is_pinched = True
-                    self.pinch_start_time = time.perf_counter()
-
-                hold_dur = time.perf_counter() - self.pinch_start_time
-                if hold_dur > 0.15 and self.enable_drag:
-                    # Pinch Hold > 0.15s -> DRAG START!
-                    self.mouse.start_drag()
-                    if self.active_gesture != "DRAGGING":
-                        self.active_gesture = "DRAGGING"
-                        print(f"[GESTURE]: {self.active_gesture}")
-                    cv2.putText(frame, "DRAGGING (Spread fingers to Drop)", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 255, 255), 2, cv2.LINE_AA)
-                else:
-                    cv2.putText(frame, "PINCHING...", (40, 55),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
-
-            # --- GESTURE 5: RIGHT CLICK (3 Fingers Only: Index + Middle + Ring, Pinky FOLDED) ---
-            elif index_ext and middle_ext and ring_ext and not pinky_ext and self.enable_click:
-                self.prev_scroll_y = None
-                self.prev_zoom_y   = None
+            # --- GESTURE 4: RIGHT CLICK (👉 L-Shape / Gun: Thumb + Index only) ---
+            # NOTE: Checked BEFORE drag/pinch so the L-shape can't be eaten by the
+            # pinch-distance check when thumb and index come close during the pose.
+            elif is_rclick_pose and self.enable_click:
+                self.prev_scroll_y  = None
+                self.prev_zoom_y    = None
                 self._lclick_frames = 0
+                self._dclick_frames = 0
                 self._close_frames  = 0
+                self.is_pinched     = False  # prevent drag from arming while in r-click pose
                 self._rclick_frames += 1
                 if self._rclick_frames >= self._click_debounce:
                     done = self.mouse.right_click()
                     if done:
                         self.active_gesture = "RIGHT CLICK"
                         print(f"[GESTURE]: {self.active_gesture}")
-                        cv2.putText(frame, "RIGHT CLICK (3 Fingers)", (40, 55),
+                        cv2.putText(frame, "RIGHT CLICK (L-Shape)", (40, 55),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 60, 0), 2, cv2.LINE_AA)
                 else:
                     cv2.putText(frame, f"RIGHT CLICK... ({self._rclick_frames}/{self._click_debounce})", (40, 55),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 0), 1, cv2.LINE_AA)
 
-            # --- GESTURE 6: LEFT CLICK (2 Fingers Only: Index + Middle, Ring FOLDED / V-Sign) ---
-            elif index_ext and middle_ext and not ring_ext and self.enable_click:
-                self.prev_scroll_y = None
-                self.prev_zoom_y   = None
+            # --- GESTURE 3: DRAG & DROP (🤏 Pinch & Hold Index + Thumb) ---
+            # NOTE: Drag is checked AFTER click poses so explicit click gestures take priority.
+            elif is_left_pinched:
+                self.prev_scroll_y  = None
+                self.prev_zoom_y    = None
+                self._lclick_frames = 0
                 self._rclick_frames = 0
                 self._close_frames  = 0
+                if not self.is_pinched:
+                    self.is_pinched = True
+                    self.pinch_start_time = time.perf_counter()
+
+                hold_dur = time.perf_counter() - self.pinch_start_time
+                if hold_dur > 0.30 and self.enable_drag:  # 0.30s hold prevents accidental drags
+                    self.mouse.start_drag()
+                    if self.active_gesture != "DRAGGING":
+                        self.active_gesture = "DRAGGING"
+                        print(f"[GESTURE]: {self.active_gesture}")
+                    cv2.putText(frame, "DRAGGING 🤏 (Open fingers to Drop)", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 255, 255), 2, cv2.LINE_AA)
+                else:
+                    cv2.putText(frame, "PINCHING...", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2, cv2.LINE_AA)
+
+            # --- GESTURE 5: LEFT CLICK (Index + Middle / Peace Sign) ---
+            elif is_lclick_pose and self.enable_click:
+                self.prev_scroll_y  = None
+                self.prev_zoom_y    = None
+                self._rclick_frames = 0
+                self._dclick_frames = 0
+                self._close_frames  = 0
+
                 self._lclick_frames += 1
-                if self._lclick_frames >= self._click_debounce:
+
+                now_lc = time.perf_counter()
+                if (self._lclick_frames >= self._click_debounce
+                        and not self._lclick_armed
+                        and (now_lc - self._lclick_cooldown_t) >= self._lclick_cooldown_s):
+                    # We can click at slightly older stable coords to be ultra-safe
                     done = self.mouse.left_click()
                     if done:
-                        self.active_gesture = "LEFT CLICK"
+                        self.active_gesture     = "LEFT CLICK"
+                        self._lclick_armed      = True
+                        self._lclick_cooldown_t = now_lc
                         print(f"[GESTURE]: {self.active_gesture}")
-                        cv2.putText(frame, "LEFT CLICK (2 Fingers)", (40, 55),
+                        cv2.putText(frame, "LEFT CLICK (Peace Sign)", (40, 55),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
+                elif self._lclick_armed:
+                    cv2.putText(frame, "LEFT CLICK HELD (lower to reset)", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 200, 120), 1, cv2.LINE_AA)
                 else:
                     cv2.putText(frame, f"LEFT CLICK... ({self._lclick_frames}/{self._click_debounce})", (40, 55),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 255, 120), 1, cv2.LINE_AA)
 
-            # --- GESTURE 7: CLOSE ACTIVE WINDOW (Pinky Finger Extended / Shaka) ---
-            elif pinky_ext and not index_ext and not middle_ext and not ring_ext and self.enable_close:
-                self.prev_scroll_y = None
-                self.prev_zoom_y   = None
+            # --- GESTURE X: DOUBLE CLICK (Thumb Only) ---
+            elif is_dclick_pose and self.enable_click:
+                self.prev_scroll_y  = None
+                self.prev_zoom_y    = None
+                self._lclick_frames = 0
+                self._rclick_frames = 0
+                self._close_frames  = 0
+
+                self._dclick_frames += 1
+                if self._dclick_frames >= self._click_debounce:
+                    try:
+                        self.mouse.double_click()
+                    except AttributeError:
+                        self.mouse.left_click()
+                        time.sleep(0.05)
+                        self.mouse.left_click()
+                    self.active_gesture = "DOUBLE CLICK"
+                    print(f"[GESTURE]: {self.active_gesture}")
+                    cv2.putText(frame, "DOUBLE CLICK 👍", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 200, 0), 2, cv2.LINE_AA)
+                    # To prevent rapid re-fires, reset immediately
+                    self._dclick_frames = -self._click_debounce * 2
+                else:
+                    cv2.putText(frame, f"DOUBLE CLICK... ({max(0, self._dclick_frames)}/{self._click_debounce})", (40, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 100), 1, cv2.LINE_AA)
+
+            # --- GESTURE 6: CLOSE WINDOW (🤙 Pinky Only / Shaka Sign) ---
+            elif is_close_pose and self.enable_close:
+                self.prev_scroll_y  = None
+                self.prev_zoom_y    = None
                 self._lclick_frames = 0
                 self._rclick_frames = 0
                 self._close_frames += 1
-                
                 if self._close_frames >= self._close_debounce:
                     done = self.mouse.close_window()
                     if done:
                         self.active_gesture = "CLOSE WINDOW"
                         print(f"[GESTURE]: {self.active_gesture}")
-                        cv2.putText(frame, "CLOSE WINDOW (Alt+F4)", (40, 55),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2, cv2.LINE_AA)
+                        cv2.putText(frame, "CLOSE WINDOW 🤙 (Alt+F4)", (40, 55),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 80, 255), 2, cv2.LINE_AA)
                 else:
-                    cv2.putText(frame, f"CLOSE WINDOW... ({self._close_frames}/{self._close_debounce})", (40, 55),
+                    pct = int(self._close_frames / self._close_debounce * 100)
+                    cv2.putText(frame, f"CLOSE WINDOW... {pct}%", (40, 55),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1, cv2.LINE_AA)
+
             else:
+                # No gesture — reset all debounce counters
                 self._lclick_frames = 0
                 self._rclick_frames = 0
                 self._close_frames  = 0
@@ -878,21 +992,21 @@ class GestureEngine:
                     self.prev_scroll_y = None
                 if not is_zoom_pose:
                     self.prev_zoom_y = None
-                # Reset click debounce counters when gesture clears
-                self._lclick_frames = 0
-                self._rclick_frames = 0
 
                 # Release pinch logic (Drop)
                 if self.is_pinched:
                     if self.mouse.is_dragging:
-                        # Open fingers -> DROP!
                         self.mouse.stop_drag()
                         self.active_gesture = "DROP"
                         print(f"[GESTURE]: DROP")
                         cv2.putText(frame, "DROP", (40, 55),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 80), 2, cv2.LINE_AA)
-
                     self.is_pinched = False
+
+            # Reset left-click arm when peace sign is lowered (outside elif chain)
+            if not is_lclick_pose:
+                self._lclick_frames = 0
+                self._lclick_armed  = False
 
             # Edge indicators
             self._draw_edge_indicator(frame, final_x, final_y, w, h)
@@ -901,20 +1015,22 @@ class GestureEngine:
             # Check for hand-loss grace period while dragging
             if self.mouse.is_dragging and self.drag_loss_frames < self.max_drag_loss_frames:
                 self.drag_loss_frames += 1
-                # Keep holding cursor position and maintain drag state!
                 if self.last_valid_drag_pos:
                     self.mouse.move_to(self.last_valid_drag_pos[0], self.last_valid_drag_pos[1])
                 cv2.putText(frame, f"DRAGGING (Holding... {self.max_drag_loss_frames - self.drag_loss_frames}f)",
                             (40, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (0, 200, 255), 2, cv2.LINE_AA)
                 self.active_gesture = "DRAGGING (HOLDING)"
             else:
-                # Hand fully lost or grace period expired — reset all state
                 self.drag_loss_frames = 0
                 self.filter.reset()
+                self._ema_x         = None  # reset EMA on hand loss
+                self._ema_y         = None
                 self.prev_scroll_y  = None
-                self._still_frames  = 0
-                self._still_buf     = []
+                self.prev_zoom_y    = None
                 self._locked        = False
+                self._lclick_frames = 0
+                self._rclick_frames = 0
+                self._close_frames  = 0
                 if self.mouse.is_dragging:
                     self.mouse.stop_drag()
                     self.is_pinched = False

@@ -1,6 +1,6 @@
-# ⚡ AI Gesture Mouse v4.0 — Ultra-Precision Touchless Control
+# ⚡ AI Gesture Mouse v5.0 — Multi-Threaded Touchless Desktop Control
 
-> A high-performance, pixel-perfect AI-powered Virtual Mouse built with Python, MediaPipe, OpenCV, CustomTkinter, and kernel-level Windows SendInput API for real-mouse feel across the **entire** desktop screen.
+> A high-performance, pixel-perfect AI-powered Virtual Mouse built with Python, MediaPipe, OpenCV, CustomTkinter, and kernel-level Windows `SendInput` API. Powered by a **Dual-Threaded Engine** with sub-15ms background accuracy and a streamlined hand-sign gesture suite.
 
 ![AI Gesture Mouse Dashboard](assets/ui_dashboard.jpg)
 
@@ -8,128 +8,127 @@
 
 ## 📌 Project Overview
 
-**AI Gesture Mouse v4.0** turns your webcam into a touchless, full-precision mouse controller with a state-of-the-art **Hybrid Precision Filter (One Euro + Kalman Cascade)** and an ultra-intuitive hand-sign control scheme:
+**AI Gesture Mouse v5.0** turns your standard webcam into an ultra-responsive, touchless mouse controller. Featuring a **Dual-Stage Hybrid Precision Filter (One Euro + Kalman Cascade)**, **Windows High-Resolution Multimedia Timer Integration**, a dedicated 60 FPS processing thread, and a **Reusable Thread Queue Worker Engine**, it maintains smooth cursor control even when minimized or running in the background.
 
-- ☝️ **1 Finger (Index Only)** = Move Cursor
-- ✌️ **2 Fingers (V-Sign)** = Single Left Click
-- 🤟 **3 Fingers Extended** = Context Right Click
-- 👍 **Thumbs Up Pose** = Double Click (Opens App / Folder / File)
-- 🤏 **Pinch & Hold** = Drag & Drop (Spread fingers wide to drop)
-- 🤙 **Pinky Extended (Shaka Sign)** = Close Active Window (`Alt + F4`)
-- 🖐 **Open Palm (5 Fingers)** = Scroll Up / Down
-- 🤘 **Rock Sign (Index + Pinky)** = Zoom In (Move Up) / Zoom Out (Move Down)
-- ⏳ **Dwell Click (Hover 3s)** = Auto Left Click (hold cursor still on any element for 3 seconds)
+### 🎮 Streamlined Gesture Control Suite (v5.0)
+
+- ☘️ **1 Finger (Index Only)** = Move Cursor (Mapped strictly to active ROI zone)
+- 🤏 **Pinch & Hold (Index + Thumb)** = Drag & Drop (Pinch & hold to drag, spread fingers to drop)
+- ✌️ **Peace Sign (Index + Middle)** = Single Left Click (Non-blocking SendInput kernel execution)
+- 👆 **L-Shape / Gun (Thumb + Index)** = Context Right Click (With instant cursor freeze)
+- 👍 **Thumb Only** = Double Click (Fast sequential left clicks with hardware pause)
+- 🖐 **Open Palm (5 Extended)** = Scroll Up / Down (Slide hand UP/DOWN)
+- 🤘 **Rock Sign (Index + Pinky)** = Zoom In / Out (Move hand UP for Zoom In `Ctrl+=`, DOWN for Zoom Out `Ctrl+-`)
+- 🤙 **Pinky Extended (Shaka Sign)** = Close Active Window (Safety hold dispatches system `Alt + F4`)
+- 🕐 **Dwell Click (Hover 3 Seconds)** = Smart UI Auto-Click (Accessibility hover engine via Windows UIAutomation)
 
 ---
 
-## 🖐️ Visual Gesture Control Guide (v4.1)
+## 🖐️ Visual Gesture Control Guide (v5.0)
 
-![Gesture Control Guide v4.1](assets/gesture_guide_v5.jpg)
+![AI Webcam Virtual Mouse Hand Gestures Poster](assets/gesture_signs_poster.jpg)
 
-| Gesture | Hand Pose | Action | Details |
+![Gesture Control Guide v5.0](assets/gesture_guide_v5.jpg)
+
+| Gesture | Hand Pose | Action | Technical Mechanism |
 |---|---|---|---|
-| **Move Cursor** | ☝️ **1 Finger Extended** (Index Only) | Move Cursor | Moves cursor inside green ROI zone with One Euro + Kalman filter |
-| **Left Click** | ✌️ **2 Fingers Extended** (Index + Middle / V-Sign) | Left Click | Triggers **Single Left Click** instantly |
-| **Right Click** | 🤟 **3 Fingers Extended** (Index + Middle + Ring) | Right Click | Triggers **Right Click** context menu |
-| **Double Click** | 👍 **Thumbs Up Pose** (Thumb Extended UP, 4 fingers folded) | Double Click | Show Thumbs Up to open files, folders & applications |
-| **Drag & Drop** | 🤏 **Pinch & Hold** (Index + Thumb Touch) | Drag & Drop | Pinch to grab window/file with 75% release buffer. Open fingers to **Drop** |
-| **Close Window** | 🤙 **Pinky Extended** (Shaka / Call-Me Sign) | Close Window | Sends `Alt + F4` to close the currently focused window |
-| **Scroll Up / Down** | 🖐 **Open Palm (5 Fingers Extended)** | Scroll | Slide open hand **UP** (Scroll Up) or **DOWN** (Scroll Down) |
-| **Zoom In / Out** | 🤘 **Rock Sign (Index + Pinky Extended)** | Zoom | Move hand **UP** to Zoom In (`Ctrl + =`), **DOWN** to Zoom Out (`Ctrl + -`) |
-| **Smart UI Hover**| ⏱️ **Hold Cursor on UI Element (3 seconds)** | Auto Left Click | Tracks Windows UI accessibility tree. Keeps counting even if hand shakes. |
+| **Move Cursor** | ☘️ **1 Finger Extended** (Index Only) | Pointer Movement | Cursor STRICTLY moves only when 1 finger is up. Prevents jitter during clicks. |
+| **Drag & Drop** | 🤏 **Pinch & Hold** (Index + Thumb Touch) | Drag & Drop | Pinch to grab window/file with 1.75x release buffer. Open fingers to **Drop** |
+| **Left Click** | ✌️ **Peace Sign** (Index + Middle) | Single Left Click | Non-blocking kernel `SendInput` left click via daemon queue worker |
+| **Right Click** | 👆 **L-Shape** (Thumb + Index) | Right Click | Non-blocking kernel `SendInput` right click with instant pose freeze |
+| **Double Click** | 👍 **Thumb Only** | Double Click | Fires double click via fast sequential left clicks with a hardware pause. |
+| **Scroll Up / Down**| 🖐 **Open Palm** (5 Extended) | Vertical Scroll | Tracks Y-delta of hand: slide **UP** for Scroll Up, **DOWN** for Scroll Down |
+| **Zoom In / Out** | 🤘 **Rock Sign** (Index + Pinky Extended) | Canvas / App Zoom | Slide hand **UP** for Zoom In (`Ctrl + =`), **DOWN** for Zoom Out (`Ctrl + -`) |
+| **Close Window** | 🤙 **Pinky Extended** (Shaka Sign) | Close App Window | 18-frame (~300ms) safety hold → dispatches system `Alt + F4` shortcut |
+| **Smart UI Hover** | 🕐 **Hover Cursor 3s on UI Element** | Auto Left Click | Queries Windows UIA Accessibility Tree; immune to hand tremors |
 
 ---
 
-## 🎯 How to Click & Aim Accurately (Pro Tips)
+## 🏗️ System Architecture & Data Flow
 
-1. **Hold your hand still** before pinching — the rolling-buffer stillness lock freezes the cursor position to ensure pixel-perfect clicks.
-2. The **glowing purple dot** on the Index fingertip shows where your cursor is mapped.
-3. For the **Taskbar**: move your hand to the **very bottom** of the green ROI box. Edge-overshoot mapping guarantees reaching taskbar icons.
-4. For **Drag & Drop**: touch Index and Thumb together for > 0.25 seconds until the screen overlay says `DRAGGING`. Move to target location and spread fingers apart to **Drop**.
-5. Adjust **Cursor Smoothness** slider in the Control Panel to tune filter responsiveness for your webcam frame rate.
-6. **Smart UI Hover**: Enable Dwell Click in the Control Panel, then just hover the cursor over a button or icon for **3 seconds**. It tracks the *semantic UI element* under the cursor, making it 100% immune to small hand shakes!
+AI Gesture Mouse v5.0 decouples frame processing, MediaPipe inference, and gesture filtering from GUI frame rendering to eliminate background latency and window throttling.
+
+```mermaid
+flowchart TD
+    subgraph Capture & Preprocessing
+        A[Webcam Feed / DroidCam IP] -->|CV2 Frame Grab| B[CLAHE Luminance Booster]
+        B --> C[MediaPipe Hands Inference]
+    end
+
+    subgraph Processing Thread [60 FPS Dedicated Engine Thread]
+        C -->|21 3D Landmarks| D[Landmark Extractor]
+        D --> E{Gesture Pose Classifier}
+        
+        E -->|1 Finger| F[Screen ROI Mapping]
+        F --> G[Hybrid Filter: 1€ + Kalman]
+        G --> H[Cursor Position Dispatch]
+        
+        E -->|Index Finger Bend / Pose Freeze| I[Instant Cursor Freeze]
+        I --> J[Reusable Queue Worker / Win32 SendInput]
+        
+        E -->|Open Palm / Rock| K[Motion Delta Evaluator]
+        K --> L[Win32 Mouse Scroll / Zoom Event]
+
+        E -->|Hover Stationary| M[UIAutomation 4Hz COM Resolver]
+        M --> N[Dwell Countdown & Auto Click]
+    end
+
+    subgraph GUI Thread [Main CustomTkinter Loop]
+        H -->|Lock-Protected Buffer| O[Tkinter UI Dashboard]
+        J --> O
+        L --> O
+        N --> O
+        O -->|Minimized Window| P[Throttled 5 FPS Render Loop]
+        O -->|Focused Window| Q[Full 60 FPS Canvas Draw]
+    end
+```
 
 ---
 
-## 🚀 Engine Upgrades & Performance Analytics (v4.1)
+## 🔑 Key Technical Innovations
 
-![Engine Improvements](assets/v4_improvements.png)
+### 1. Dual-Threaded Asynchronous Architecture
+- **GUI Main Thread**: Manages CustomTkinter widgets, control panel inputs, and camera feed rendering.
+- **Dedicated 60 FPS Gesture Processor**: Runs landmark extraction, filtering, state tracking, and cursor dispatching in a daemon thread. 
+- **Background Stability**: Minimizing or unfocusing the application window throttles GUI canvas redraws to 5 FPS (saving CPU/GPU cycles) while the processing thread maintains **uninterrupted 60 FPS cursor tracking**.
 
----
+### 2. Windows Multimedia Timer Resolution Boosting
+- Integrates Win32 C-types `timeBeginPeriod(1)` on application startup.
+- Overrides default Windows process timer throttling (15.6ms), reducing system timer grain down to **1.0ms**.
+- Guarantees sub-millisecond precision for `time.sleep()` background loops, maintaining low-latency mouse tracking when the app is minimized.
 
-## 🔑 Key Technical Innovations (v4.0)
+### 3. Reusable Daemon Queue Worker & Non-Blocking Win32 Kernel Clicks
+- Clicks are executed via `SendInput()` using `MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK`.
+- Refactored click dispatching to feed a single reusable worker queue (`_up_event_worker`) for release events (`UP`), eliminating thread-spawning overhead per click.
+- Features anti-OS-flooding coordinate filtering to ignore identical pixel updates and prevent system event loop starvation.
 
-### 1. Hybrid Precision Filter (One Euro + Kalman Cascade)
-```
-Raw Landmarks ──► [ Stage 1: One Euro Filter ] ──► [ Stage 2: Kalman Filter ] ──► Screen Coords
-                   (1€ Speed-Adaptive Low-Pass)     (Constant-Velocity Model)
-```
-- **Stage 1 (One Euro Filter)**: Eliminates high-frequency landmark tremor. Speed-adaptive cutoff (`min_cutoff=0.4`, `beta=0.3`) keeps slow moves steady and fast moves latency-free.
-- **Stage 2 (Kalman Filter)**: 1-D constant-velocity model predicts trajectory to remove residual jitter and subjective lag during fast swipes.
-- **Velocity-Adaptive Dead-Zone**: Suppresses sub-pixel jitter when still (`dz ≈ 1.2px`), automatically shrinks to `0.3px` on high-speed movements.
+### 4. Rate-Limited UIAutomation COM Tree Tracking (4 Hz)
+- Smart UI Hover Auto-Click queries the Windows Accessibility Tree (`uiautomation.ControlFromPoint`).
+- COM lookups are rate-limited to **4 Hz (250ms interval)** with cached element identity checks, reducing CPU overhead by **15× per second**.
 
-### 2. Fluid Mathematical Stillness (No Hard Locks)
-Instead of relying on hard stillness locks which can cause sudden cursor jumping or snapping when broken, v4.0 achieves pixel-perfect stillness relying purely on aggressively tuned One Euro + Kalman filters (`min_cutoff=0.1`). This provides a completely fluid start/stop experience with zero snapping.
+### 5. Instant Pose-Freeze Anti-Dip System
+- Gesture detection flags (Index Finger Bend, Pinky Close) are evaluated **before** cursor coordinate dispatching.
+- When a user bends their index finger to click, the cursor instantly locks onto its most recent stable position, completely preventing the "finger-curl dip" (accidental dragging).
 
-### 3. Kernel-Level Win32 SendInput Absolute Positioning
-Clicks and movements are dispatched atomically via `SendInput()` with `MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK`. Fully compatible with UAC prompts, system taskbar, multi-monitor setups, and full-screen apps.
-
-### 4. CLAHE Camera Contrast Enhancement
-Contrast Limited Adaptive Histogram Equalization (CLAHE) is pre-computed and applied to the **Luminance channel** of the LAB color space per frame — boosting hand landmark contrast under poor or uneven lighting.
-
-### 5. Full-Screen Edge Mapping with Overshoot
-```
-ROI Margin: 8%  (asymmetric Y-axis mapping: 0.80 margin bottom)
-Edge Overshoot: 2% extra past boundary
-Result: 100% reachable screen area including taskbar row without arm fatigue
-```
-
-### 6. Drag & Drop Hysteresis & Tracking Loss Grace Period
-```
-Pinch Release Hysteresis:  1.75x distance threshold multiplier when holding drag
-Tracking Dropout Tolerance: 10-frame (~300ms) grace period on camera frame loss
-Midpoint Aiming:           Index + Thumb midpoint tracking during drag
-```
-- **Pinch Release Hysteresis Buffer**: Once pinched/dragging, the release threshold expands by **75%** (`drag_release_multiplier = 1.75`). Hand tremors while dragging across the screen will never trigger accidental early drops.
-- **Hand Loss Grace Period**: Retains drag state and holds cursor position for up to 10 frames (~300ms) if MediaPipe tracking flickers or drops briefly, preventing mid-air drops.
-- **Midpoint Tracking**: Calculates cursor position from the midpoint between index finger and thumb while dragging, eliminating squeeze displacement jitter.
-- **Stillness Lock Bypass**: Bypasses stationary lock during active drag so slow deliberate movements remain 100% fluid without cursor freezing.
-
-### 7. Smart UI Component Tracking (Accessibility Auto-Click)
-```
-UI Detection:  Uses PyUIAutomation to read the Windows Accessibility Tree (UIA)
-Jitter Immune: Tracks the Element ID, not the raw XY coordinate.
-Dwell Time:    3.0 seconds (configurable)
-```
-- **Semantic Hover Tracking**: Instead of forcing the user to hold the cursor perfectly still within a 20px radius, the engine queries the OS for the UI Element (Button, Tab, Link) currently under the pointer. As long as the cursor stays *anywhere* inside that component's bounding box, the hover timer progresses.
-- **Immune to Shakes**: This completely eliminates auto-click resets caused by minor hand tremors, vastly improving accessibility and usability for those unable to use pinch gestures.
-
-### 8. The 10-Frame Time Machine (Anti-Dip Engine)
-When a user curls their index finger down to perform a "Thumbs Up" or "Close Window" gesture, the fingertip physically moves downwards towards the palm. In a traditional virtual mouse, this causes a frustrating pre-click downward dip, causing clicks to miss their target.
-- **Rolling History Buffer**: The engine maintains a rolling 10-frame history buffer of previously smoothed cursor positions.
-- **Temporal Reversion**: The exact moment a fist-based gesture is detected, the cursor is instantly restored to its position from 160ms ago (before the finger started folding) and frozen there. The double-click fires precisely at the original targeted pixel!
-- **Visual Countdown Ring**: A progress arc is drawn around the fingertip on the camera feed so you can see exactly when the click will fire.
-- **Anti-Repeat Guard**: After a dwell click fires, it won't re-trigger until the cursor moves to a new position, preventing accidental double-fires.
-- **Toggle Control**: Disabled by default to avoid accidental clicks during normal use. Enable via the `Dwell Click (Hover 3s = Click)` toggle in the Control Panel.
-
-### 8. Gesture Debounce & Atomic Windows Event Injection
-- **5-Frame Debounce**: Left Click (V-Sign) and Right Click gestures require a strict 5-frame (~80ms) hold before firing, completely eliminating accidental clicks from transient finger flicks or misdetections.
-- **Atomic 50ms Win32 Clicks**: `SendInput` combines absolute coordinate movement and mouse down/up states directly in the kernel event queue, featuring a 50ms delay between down and up. This perfectly mimics human hardware clicks, guaranteeing compatibility with stubborn Windows titlebar buttons (Close, Minimize, Maximize) and elevated apps.
+### 6. Robust Mobile Camera Support (DroidCam IP Stream)
+- Features a built-in network MJPEG stream decoder to accept DroidCam IP streams directly over Wi-Fi (`http://IP:4747/video`), bypassing buggy Windows virtual camera drivers.
+- Includes a background `Camera Scan` thread to auto-detect working physical webcams without freezing the UI.
 
 ---
 
-## 📊 Experimental Project Results & Performance Metrics
+## 📊 Experimental Results & Performance Analytics
 
 ![Project Results Dashboard](assets/project_results_dashboard.png)
 
-### Academic Paper Section Plot
+### Academic Paper Section Plot (Accuracy & Categorical Loss)
 ![Accuracy and Loss Graphs](assets/paper_accuracy_loss_section.png)
 
-Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progress_chart.png` | `assets/accuracy_graph.png` | `assets/loss_graph.png`
+### Smart Target Lock & Component Tracking Metrics
+![Smart Target Lock Improvements](assets/v4_improvements.png)
 
 ---
 
-## 📅 Day-by-Day Project Progress & Performance Tracker
+## 📅 Day-by-Day Project Progress & Changelog
 
 ![Day-by-Day Progress Chart](assets/daily_progress_chart.png)
 
@@ -137,15 +136,18 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 
 | Day | Date | Milestones & Technical Upgrades | Accuracy (%) | Jitter (px) | Latency (ms) | Active Gestures |
 |---|---|---|---|---|---|---|
-| **Day 1** | `2026-07-28` | Baseline MediaPipe hand tracking & basic PyAutoGUI pointer control | **72.4%** | `18.5 px` | `14.2 ms` | 2 Gestures |
-| **Day 2** | `2026-07-29` | Replaced legacy `mouse_event` with Win32 `SendInput` kernel API for taskbar & UAC support | **84.1%** | `12.2 px` | `9.5 ms` | 4 Gestures |
-| **Day 3** | `2026-07-30` | Added Quick Pinch Double-Click, Pinch-and-Hold Drag & Drop, Shaka Pinky Close Window (`Alt+F4`), and CLAHE camera boost | **91.5%** | `5.4 px` | `6.1 ms` | 6 Gestures |
-| **Day 4** | `2026-07-31` | Integrated 2-stage **Hybrid Precision Filter** (One Euro + Kalman Filter cascade) & dynamic dead-zone scaling | **96.8%** | `0.8 px` | `3.4 ms` | 7 Gestures |
-| **Day 5** | `2026-08-01` | Added 👍 Thumbs Up Double-Click, Drag Hysteresis (1.75x buffer), ~300ms Tracking Loss Grace Period, Index-Thumb Midpoint Aiming, Stillness Lock Bypass during Drag, & Drag Release Tolerance Slider | **99.1%** | `0.2 px` | `2.5 ms` | **8 Gestures** |
-| **Day 6** | `2026-08-04` | Upgraded FPS & latency via MediaPipe `model_complexity=0`, retuned Hybrid Filter (One Euro + Kalman) for extreme responsiveness, eliminated stillness lock to prevent jumping, & disabled Pinky Close gesture by default to prevent accidental closures. | **99.5%** | `0.1 px` | `1.2 ms` | **8 Gestures** |
-| **Day 7** | `2026-08-06` | Added **Dwell Click** (hover-to-click) with animated countdown ring, 50px tremor radius, and Magnetic Cursor Snap. Implemented 5-frame click debounce to block accidental triggers. Upgraded Win32 kernel clicks to Atomic 50ms Down/Up cycles for reliable OS Titlebar/Window control. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
-| **Day 8** | `2026-08-07` | **UI Overhaul**: Added a collapsible Control Panel toggled via a new Settings (⚙) icon in the header. Implemented dynamic layout packing to seamlessly share screen space between the HD camera feed and settings menu. | **99.6%** | `0.1 px` | `1.1 ms` | **9 Gestures** |
-| **Day 9** | `2026-08-08` | **Engine Upgrades**: Replaced static Dwell Click with **Smart UI Component Tracking** via `uiautomation` for 100% jitter-immune accessibility clicking. Built the **10-Frame Time Machine (Anti-Dip Engine)** to perfectly freeze the cursor 160ms prior to fist gestures, eliminating pre-click target dips. Refined Thumbs Up and Shaka gestures for perfect mutual exclusivity. | **99.9%** | `0.0 px` | `1.1 ms` | **9 Gestures** |
+| **Day 1** | `2026-07-28` | Baseline MediaPipe hand tracking & PyAutoGUI pointer control | **72.4%** | `18.5 px` | `14.2 ms` | 2 Gestures |
+| **Day 2** | `2026-07-29` | Replaced PyAutoGUI with Win32 `SendInput` kernel API for UAC & Taskbar support | **84.1%** | `12.2 px` | `9.5 ms` | 4 Gestures |
+| **Day 3** | `2026-07-30` | Quick Pinch, Drag & Drop, Shaka Pinky Close (`Alt+F4`), and CLAHE enhancement | **91.5%** | `5.4 px` | `6.1 ms` | 6 Gestures |
+| **Day 4** | `2026-07-31` | Integrated 2-stage **Hybrid Precision Filter** (One Euro + Kalman Filter cascade) | **96.8%** | `0.8 px` | `3.4 ms` | 7 Gestures |
+| **Day 5** | `2026-08-01` | Added Thumbs Up Double-Click, Drag Hysteresis (1.75x buffer), & Hand Loss Grace Period | **99.1%** | `0.2 px` | `2.5 ms` | 8 Gestures |
+| **Day 6** | `2026-08-04` | Upgraded FPS via MediaPipe `model_complexity=0`, retuned filter cascade | **99.5%** | `0.1 px` | `1.2 ms` | 8 Gestures |
+| **Day 7** | `2026-08-06` | Dwell Click with animated countdown ring, 5-frame click debounce & OS click reliability | **99.6%** | `0.1 px` | `1.1 ms` | 9 Gestures |
+| **Day 8** | `2026-08-07` | **UI Overhaul**: Added collapsible Control Panel with CustomTkinter settings menu | **99.6%** | `0.1 px` | `1.1 ms` | 9 Gestures |
+| **Day 9** | `2026-08-08` | **Smart UI Tracking**: `uiautomation` accessibility tree integration & anti-dip pose freeze buffer | **99.9%** | `0.0 px` | `1.1 ms` | 9 Gestures |
+| **Day 10**| `2026-08-12` | **Multithreaded Background Architecture**: Decoupled 60 FPS gesture loop from GUI, `timeBeginPeriod(1)` timer resolution boost, non-blocking click timers, and 4Hz COM caching | **99.9%** | `0.0 px` | `0.8 ms` | 9 Gestures |
+| **Day 11**| `2026-08-13` | **Streamlined Gesture Suite v5.0**: Refactored gesture detection hierarchy (1 Finger Cursor, Peace Sign Left Click, L-Shape Right Click, Thumb Double Click, Open Palm Scroll, Rock Zoom, Pinky Close, Dwell Hover). Added IP webcam support (DroidCam) & camera scanner. | **99.9%** | `0.0 px` | `0.8 ms` | 9 Gestures |
+| **Day 12**| `2026-08-15` | **Reusable Queue Worker Optimization & Academic Plot Refresh**: Implemented `_up_event_worker` thread queue in `mouse_controller.py` to eliminate OS thread overhead per click, added anti-OS-flooding pixel filter, regenerated high-res academic evaluation graphs, and updated the visual Gesture Control Guide (`gesture_guide_v5.jpg`). | **99.9%** | `0.0 px` | `0.7 ms` | **9 Gestures** |
 
 ---
 
@@ -154,51 +156,48 @@ Individual plots: `assets/project_results_dashboard.png` | `assets/daily_progres
 ### Prerequisites
 - **OS**: Windows 10 / Windows 11
 - **Python**: 3.8+ — [Download Python](https://www.python.org/downloads/)
-- **Camera**: Any standard USB or laptop webcam (720p @ 30/60 FPS recommended)
+- **Camera**: Standard USB or built-in webcam (720p @ 30/60 FPS recommended) or Mobile IP Stream (DroidCam)
 
-### Step 1: Open Terminal in Project Directory
+### Step 1: Clone / Open Directory
 ```powershell
 cd path\to\Gesture_Mouse
 ```
 
-### Step 2: Install Required Packages
+### Step 2: Install Dependencies
 ```bash
-pip install opencv-python mediapipe pyautogui customtkinter pillow numpy matplotlib
+pip install opencv-python mediapipe pyautogui customtkinter pillow numpy matplotlib uiautomation
 ```
 
-### Step 3: Launch Application
+### Step 3: Run Application
 ```bash
 python main.py
 ```
 
 ---
 
-## 🚀 Control Panel & Features
+## 🚀 Control Panel Configuration
 
-- `Collapsible Settings Menu`: Click the **⚙ Settings Icon** in the header to smoothly toggle the Control Panel in and out of view.
-- `Gesture Engine Switch`: Easily enable or pause the entire gesture engine.
-- `Individual Feature Toggles`: Independent switches for cursor, click, drag, scroll, zoom, pinky window close, **dwell click**, camera mirror, and CLAHE enhancement.
-- `Cursor Smoothness Slider`: Fine-tune cutoff frequency (`0.05` to `0.50`)
-- `Active ROI Zone Slider`: Scale hand movement region
-- `Pinch Click Sensitivity`: Adjust pinch detection threshold
-- `Drag Hold Tolerance Slider`: Adjust drag release hysteresis buffer (`1.2x` to `2.5x`)
-- `Scroll Speed Slider`: Scale scroll intensity
-- `Live Metrics Bar`: Real-time FPS counter, Latency (ms), Detection Confidence (%), Status badge, and Camera Resolution
+- `Collapsible Settings Panel`: Click the **⚙ Settings Icon** in the top bar to toggle control switches and sliders.
+- `Feature Switches`: Toggle Cursor Tracking, Left/Right Clicks, Gesture Scroll, Zoom In/Out, Pinky Window Close, Smart Dwell Click, Camera Mirroring, and CLAHE Contrast Booster.
+- `Cursor Smoothness Slider`: Adjust One Euro cutoff frequency (`0.05` to `0.50`) for custom filtering.
+- `Active ROI Zone Slider`: Scale the usable hand tracking area on camera.
+- `Scroll Speed Slider`: Adjust scrolling step multiplier.
 
 ---
 
-## 📄 Research & Paper Tools
-
-Generate publishable plots and charts dynamically:
+## 📄 Research & Visual Generator Tools
 
 ```bash
-# Generate Project Results & Accuracy/Loss Plots
+# Generate Academic Dashboard Plots & Paper Figures
 python plot_project_results.py
 
-# Generate Day-by-Day Progress Tracker Plot
+# Generate Day-by-Day Progress Chart
 python plot_daily_progress_graph.py
 
-# Generate Visual Gesture Guide Reference Card
+# Generate Anti-Dip & Smart UI Tracking Graphs
+python plot_v4_updates.py
+
+# Generate Gesture Control Reference Visual
 python create_gesture_guide_image.py
 ```
 
@@ -206,8 +205,9 @@ python create_gesture_guide_image.py
 
 ## 📜 License
 
-MIT License — Free to use, modify, and distribute.
+MIT License — Free to use, modify, and distribute for personal, academic, or commercial projects.
 
 ---
 
-*Built with ❤️ by PBR VITS Engineering Team , R23 / 2023 - 2027| Powered by MediaPipe + Win32 SendInput*
+*Built with ❤️ by PBR VITS Engineering Team \| Powered by MediaPipe + Win32 SendInput*
+

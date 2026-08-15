@@ -1,6 +1,8 @@
 import ctypes
 import ctypes.wintypes
 import time
+import threading
+import queue
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Win32 SendInput structures  (kernel-level, works on UAC-elevated apps & taskbar)
@@ -67,7 +69,7 @@ class FastMouseController:
 
         # Independent cooldowns (seconds)
         self.last_left_click   = 0.0
-        self.left_cooldown     = 0.20   # 200 ms between left clicks
+        self.left_cooldown     = 0.35   # 350 ms between left clicks (prevents debounce double-fires)
 
         self.last_right_click  = 0.0
         self.right_cooldown    = 0.35   # 350 ms between right clicks (context menu needs time)
@@ -81,7 +83,26 @@ class FastMouseController:
         self.last_zoom_time    = 0.0
         self.zoom_cooldown     = 0.30
 
+        # ── Reusable UP-event daemon thread (avoids spawning a new OS thread per click) ──
+        # A lightweight queue feeds (flags, dx, dy) tuples; the daemon fires them after a delay.
+        self._up_queue  = queue.Queue()
+        self._up_thread = threading.Thread(target=self._up_event_worker, daemon=True, name="MouseUpThread")
+        self._up_thread.start()
+
     # ── Internal helpers ────────────────────────────────────────────────────
+
+    def _up_event_worker(self):
+        """
+        Reusable daemon thread: waits for (delay, INPUT) items from _up_queue
+        and fires the UP event after the specified delay.
+        Replaces threading.Timer — no new OS thread spawned per click.
+        """
+        while True:
+            delay, up_event = self._up_queue.get()
+            if delay > 0:
+                time.sleep(delay)
+            self._send_input(up_event)
+            self._up_queue.task_done()
 
     def _pixel_to_abs(self, x, y):
         """
@@ -120,61 +141,73 @@ class FastMouseController:
         """
         target_x = max(0, min(self.screen_w - 1, int(round(x))))
         target_y = max(0, min(self.screen_h - 1, int(round(y))))
+        
+        # Anti-OS-flooding: only send if the rounded pixel actually changed
+        if target_x == self._cur_x and target_y == self._cur_y:
+            return
+            
         self._cur_x, self._cur_y = target_x, target_y
         self._send_input(self._move_input(target_x, target_y))
 
     def left_click(self):
-        """Atomic move-to-position then left click (guarantees click lands correctly)."""
+        """Non-blocking left click — DOWN fires immediately, UP fires after 50 ms via reusable daemon thread."""
         now = time.perf_counter()
         if now - self.last_left_click < self.left_cooldown:
             return False
-            
+
         ax, ay = self._pixel_to_abs(self._cur_x, self._cur_y)
         base_flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
-        
-        # Down at exact coordinate
+
+        # DOWN fires immediately — no stall on the calling thread
         self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
-        # 50ms delay for reliable OS button registration
-        time.sleep(0.05)
-        # Up at exact coordinate
-        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
-        
+
+        # Queue UP event to the reusable daemon (avoids spawning a new OS thread per click)
+        up_event = self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay)
+        self._up_queue.put((0.05, up_event))
+
         self.last_left_click = now
         return True
 
     def right_click(self):
-        """Atomic move-to-position then right click."""
+        """Non-blocking right click — DOWN fires immediately, UP fires after 50 ms via reusable daemon thread."""
         now = time.perf_counter()
         if now - self.last_right_click < self.right_cooldown:
             return False
-            
+
         ax, ay = self._pixel_to_abs(self._cur_x, self._cur_y)
         base_flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
-        
+
         self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_RIGHTDOWN, dx=ax, dy=ay))
-        time.sleep(0.05)
-        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_RIGHTUP, dx=ax, dy=ay))
-        
+
+        up_event = self._build_mouse_input(base_flags | MOUSEEVENTF_RIGHTUP, dx=ax, dy=ay)
+        self._up_queue.put((0.05, up_event))
+
         self.last_right_click = now
         return True
 
     def double_click(self):
-        """Two rapid left clicks for opening files/apps."""
+        """Two rapid left clicks for opening files/apps — fully non-blocking via daemon threads."""
         now = time.perf_counter()
         if now - self.last_double_click < self.double_cooldown:
             return False
-            
+
         ax, ay = self._pixel_to_abs(self._cur_x, self._cur_y)
         base_flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
-        
-        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
-        time.sleep(0.03)
-        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
-        time.sleep(0.03)
-        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
-        time.sleep(0.03)
-        self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
-        
+
+        def _do_double_click():
+            # Click 1
+            self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
+            time.sleep(0.03)
+            self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
+            time.sleep(0.03)
+            # Click 2
+            self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTDOWN, dx=ax, dy=ay))
+            time.sleep(0.03)
+            self._send_input(self._build_mouse_input(base_flags | MOUSEEVENTF_LEFTUP, dx=ax, dy=ay))
+
+        t = threading.Thread(target=_do_double_click, daemon=True)
+        t.start()
+
         self.last_double_click = now
         self.last_left_click   = now  # prevent accidental single click after
         return True
