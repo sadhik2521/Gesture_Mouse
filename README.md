@@ -28,7 +28,7 @@
 
 ![AI Webcam Virtual Mouse Hand Gestures Poster](assets/gesture_signs_poster.jpg)
 
-![Gesture Control Guide v5.0](assets/gesture_guide_v5.jpg)
+
 
 | Gesture | Hand Pose | Action | Technical Mechanism |
 |---|---|---|---|
