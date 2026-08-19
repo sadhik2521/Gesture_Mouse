@@ -163,7 +163,8 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 | **Day 9** | `2026-08-08` | **Smart UI Tracking**: `uiautomation` accessibility tree integration & anti-dip pose freeze buffer | **99.9%** | `0.0 px` | `1.1 ms` | 9 Gestures |
 | **Day 10**| `2026-08-12` | **Multithreaded Background Architecture**: Decoupled 60 FPS gesture loop from GUI, `timeBeginPeriod(1)` timer resolution boost, non-blocking click timers, and 4Hz COM caching | **99.9%** | `0.0 px` | `0.8 ms` | 9 Gestures |
 | **Day 11**| `2026-08-13` | **Streamlined Gesture Suite v5.0**: Refactored gesture detection hierarchy (1 Finger Cursor, Peace Sign Left Click, L-Shape Right Click, Thumb Double Click, Open Palm Scroll, Rock Zoom, Pinky Close, Dwell Hover). Added IP webcam support (DroidCam) & camera scanner. | **99.9%** | `0.0 px` | `0.8 ms` | 9 Gestures |
-| **Day 12**| `2026-08-15` | **Reusable Queue Worker Optimization & Academic Plot Refresh**: Implemented `_up_event_worker` thread queue in `mouse_controller.py` to eliminate OS thread overhead per click, added anti-OS-flooding pixel filter, regenerated high-res academic evaluation graphs, and updated the visual Gesture Control Guide (`gesture_guide_v5.jpg`). | **99.9%** | `0.0 px` | `0.7 ms` | **9 Gestures** |
+| **Day 12**| `2026-08-15` | **Reusable Queue Worker Optimization & Academic Plot Refresh**: Implemented `_up_event_worker` thread queue in `mouse_controller.py` to eliminate OS thread overhead per click, added anti-OS-flooding pixel filter, regenerated high-res academic evaluation graphs, and updated the visual Gesture Control Guide (`gesture_guide_v5.jpg`). | **99.9%** | `0.0 px` | `0.7 ms` | 9 Gestures |
+| **Day 13**| `2026-08-19` | **300 Epoch Rescaling, Plot Directory Reorganization, Simple Graph Explanations & Automated Word Doc Export**: Rescaled model parameter evaluation to 300 epochs, removed legacy v4 plot artifacts, organized graph assets into `assets/plots/`, added simple graph explanations, and created automated Word document generator (`generate_word_doc.py` $\rightarrow$ `AI_Gesture_Mouse_Documentation.docx`). | **99.9%** | `0.0 px` | `0.7 ms` | **9 Gestures** |
 
 ---
 
@@ -218,6 +219,19 @@ python create_gesture_guide_image.py
 ```
 
 ---
+
+⚙️ 2. How to Re-Generate the Word Document Anytime
+If you ever update the graphs or documentation in the future and want to update the Word document:
+
+Open your terminal in the project directory (c:\Users\shaik\Gesture_Mouse).
+Run the generator script 
+generate_word_doc.py
+:
+powershell
+
+
+python generate_word_doc.py
+This will automatically read the latest graph images from assets/plots/ and create a fresh .docx file!
 
 ## 📜 License
 
