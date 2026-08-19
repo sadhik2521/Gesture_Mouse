@@ -100,7 +100,7 @@ class GestureDataCollector:
             np.save(os.path.join(self.dataset_dir, "y_gestures.npy"), np.array(labels))
             print(f"✓ Saved dataset with {len(data)} samples to {self.dataset_dir}/")
 
-def train_model(epochs=500):
+def train_model(epochs=300):
     dataset_dir = "dataset"
     x_path = os.path.join(dataset_dir, "X_gestures.npy")
     y_path = os.path.join(dataset_dir, "y_gestures.npy")
@@ -130,7 +130,7 @@ def train_model(epochs=500):
         ])
         
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        print("Training Gesture Classifier over 500 epochs...")
+        print("Training Gesture Classifier over 300 epochs...")
         history = model.fit(X, y_cat, epochs=epochs, batch_size=32, validation_split=0.2)
         model.save("gesture_model.h5")
         print("✓ Trained model saved to gesture_model.h5")
@@ -138,4 +138,4 @@ def train_model(epochs=500):
 if __name__ == "__main__":
     collector = GestureDataCollector()
     # collector.collect_data()  # Uncomment to record live webcam gesture samples
-    train_model(epochs=500)
+    train_model(epochs=300)

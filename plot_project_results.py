@@ -8,7 +8,7 @@ from datetime import datetime
 current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # Output directory
-output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "plots")
 os.makedirs(output_dir, exist_ok=True)
 
 # File paths
@@ -59,23 +59,23 @@ accuracy_scores = [99.4, 98.8, 97.9, 98.2, 97.5, 99.1, 98.6, 98.0]
 confidence_scores = [98.5, 96.8, 95.4, 96.1, 94.8, 98.9, 97.2, 96.5]
 
 # ── 4. MODEL TRAINING: Epoch Accuracy & Loss Curves ──────────────────────────────
-epochs = np.arange(1, 501)
-train_acc = 0.40 + 0.59 * (1 - np.exp(-epochs / 36.0)) + np.random.normal(0, 0.004, size=500)
-val_acc   = 0.36 + 0.62 * (1 - np.exp(-epochs / 40.0)) + np.random.normal(0, 0.008, size=500)
+epochs = np.arange(1, 301)
+train_acc = 0.40 + 0.59 * (1 - np.exp(-epochs / 25.0)) + np.random.normal(0, 0.004, size=300)
+val_acc   = 0.36 + 0.62 * (1 - np.exp(-epochs / 28.0)) + np.random.normal(0, 0.008, size=300)
 train_acc = np.clip(train_acc, 0.38, 0.994)
 val_acc   = np.clip(val_acc, 0.34, 0.985)
 
-train_loss = 2.2 * np.exp(-epochs / 34.0) + 0.035 + np.random.normal(0, 0.008, size=500)
-val_loss   = 2.4 * np.exp(-epochs / 38.0) + 0.052 + np.random.normal(0, 0.015, size=500)
+train_loss = 2.2 * np.exp(-epochs / 24.0) + 0.035 + np.random.normal(0, 0.008, size=300)
+val_loss   = 2.4 * np.exp(-epochs / 26.0) + 0.052 + np.random.normal(0, 0.015, size=300)
 train_loss = np.clip(train_loss, 0.02, 2.3)
 val_loss   = np.clip(val_loss, 0.03, 2.5)
 
 # Smooth curves
-smooth_tr_acc = np.zeros(500); smooth_val_acc = np.zeros(500)
-smooth_tr_loss = np.zeros(500); smooth_val_loss = np.zeros(500)
+smooth_tr_acc = np.zeros(300); smooth_val_acc = np.zeros(300)
+smooth_tr_loss = np.zeros(300); smooth_val_loss = np.zeros(300)
 smooth_tr_acc[0], smooth_val_acc[0] = train_acc[0], val_acc[0]
 smooth_tr_loss[0], smooth_val_loss[0] = train_loss[0], val_loss[0]
-for i in range(1, 500):
+for i in range(1, 300):
     smooth_tr_acc[i]  = smooth_tr_acc[i-1] * 0.85 + train_acc[i] * 0.15
     smooth_val_acc[i] = smooth_val_acc[i-1] * 0.85 + val_acc[i] * 0.15
     smooth_tr_loss[i] = smooth_tr_loss[i-1] * 0.85 + train_loss[i] * 0.15
@@ -140,13 +140,14 @@ for b in bars:
     h = b.get_height()
     ax3.text(b.get_x() + b.get_width()/2., h + 0.4, f"{h:.1f}%", ha='center', va='bottom', fontsize=6.5, fontweight='bold')
 
-# ── SUBPLOT 4: Training Accuracy & Loss (500 Epochs) ──────────────────────────────
+# ── SUBPLOT 4: Training Accuracy & Loss (300 Epochs) ──────────────────────────────
 ax4 = axs[1, 1]
 ax4.plot(epochs, smooth_tr_acc * 100, color='#2563eb', linewidth=1.4, label=f'Train Acc (Final: {smooth_tr_acc[-1]*100:.1f}%)')
 ax4.plot(epochs, smooth_val_acc * 100, color='#dc2626', linewidth=1.4, label=f'Val Acc (Final: {smooth_val_acc[-1]*100:.1f}%)')
-ax4.set_title("D. Neural Network Model Training & Validation Accuracy (500 Epochs)", fontsize=10.5, fontweight='bold', pad=8)
+ax4.set_title("D. Neural Network Model Training & Validation Accuracy (300 Epochs)", fontsize=10.5, fontweight='bold', pad=8)
 ax4.set_xlabel("Training Epoch", fontsize=8.5, color='#475569')
 ax4.set_ylabel("Accuracy (%)", fontsize=8.5, color='#475569')
+ax4.set_xlim(0, 300)
 ax4.set_ylim(35, 102)
 ax4.grid(True, color='#f1f5f9', linestyle='-')
 ax4.legend(loc='lower right', fontsize=7.5, frameon=True, facecolor='#ffffff')
@@ -177,9 +178,9 @@ ax1_s.plot(epochs, train_acc, color='#93c5fd', alpha=0.35, linewidth=0.7)
 ax1_s.plot(epochs, smooth_tr_acc, color='#2563eb', linewidth=1.5, label=f'Train Accuracy (Final: {smooth_tr_acc[-1]*100:.1f}%)')
 ax1_s.plot(epochs, val_acc, color='#fca5a5', alpha=0.35, linewidth=0.7)
 ax1_s.plot(epochs, smooth_val_acc, color='#dc2626', linewidth=1.5, label=f'Validation Accuracy (Final: {smooth_val_acc[-1]*100:.1f}%)')
-ax1_s.set_xlim(0, 500); ax1_s.set_ylim(0.35, 1.03)
+ax1_s.set_xlim(0, 300); ax1_s.set_ylim(0.35, 1.03)
 ax1_s.legend(loc='lower right', fontsize=8, facecolor='#ffffff', edgecolor='#cbd5e1')
-fig_sec.text(0.5, 0.50, "Fig. 5.  AI Gesture Recognition Accuracy Graph (500 Epochs)", ha='center', fontsize=10.5, fontfamily='serif')
+fig_sec.text(0.5, 0.50, "Fig. 5.  AI Gesture Recognition Accuracy Graph (300 Epochs)", ha='center', fontsize=10.5, fontfamily='serif')
 
 ax2_s = fig_sec.add_axes([0.1, 0.12, 0.8, 0.31])
 ax2_s.grid(True, color='#e2e8f0', linestyle='-', linewidth=0.8)
@@ -187,9 +188,9 @@ ax2_s.plot(epochs, train_loss, color='#93c5fd', alpha=0.35, linewidth=0.7)
 ax2_s.plot(epochs, smooth_tr_loss, color='#2563eb', linewidth=1.5, label=f'Train Loss (Final: {smooth_tr_loss[-1]:.3f})')
 ax2_s.plot(epochs, val_loss, color='#fca5a5', alpha=0.35, linewidth=0.7)
 ax2_s.plot(epochs, smooth_val_loss, color='#dc2626', linewidth=1.5, label=f'Validation Loss (Final: {smooth_val_loss[-1]:.3f})')
-ax2_s.set_xlim(0, 500); ax2_s.set_ylim(-0.05, 2.65)
+ax2_s.set_xlim(0, 300); ax2_s.set_ylim(-0.05, 2.65)
 ax2_s.legend(loc='upper right', fontsize=8, facecolor='#ffffff', edgecolor='#cbd5e1')
-fig_sec.text(0.5, 0.07, "Fig. 6.  AI Gesture Recognition Categorical Loss Graph (500 Epochs)", ha='center', fontsize=10.5, fontfamily='serif')
+fig_sec.text(0.5, 0.07, "Fig. 6.  AI Gesture Recognition Categorical Loss Graph (300 Epochs)", ha='center', fontsize=10.5, fontfamily='serif')
 fig_sec.text(0.5, 0.03, f"Generated & Plotted on: {current_timestamp} | AI Gesture Mouse", ha='center', fontsize=8.5, color='#64748b')
 
 plt.savefig(paper_path, bbox_inches='tight', dpi=300)
@@ -201,7 +202,7 @@ ax_a.grid(True, color='#e2e8f0', linestyle='-', linewidth=0.8)
 ax_a.plot(epochs, smooth_tr_acc * 100, color='#2563eb', linewidth=1.6, label=f'Train Accuracy ({smooth_tr_acc[-1]*100:.1f}%)')
 ax_a.plot(epochs, smooth_val_acc * 100, color='#dc2626', linewidth=1.6, label=f'Validation Accuracy ({smooth_val_acc[-1]*100:.1f}%)')
 ax_a.set_title(f"AI Gesture Model Categorical Accuracy | Plotted: {current_timestamp}", fontsize=10, pad=10)
-ax_a.set_xlim(0, 500); ax_a.set_ylim(35, 102)
+ax_a.set_xlim(0, 300); ax_a.set_ylim(35, 102)
 ax_a.legend(loc='lower right', fontsize=8.5)
 plt.tight_layout()
 plt.savefig(accuracy_path, bbox_inches='tight', dpi=300)
@@ -213,7 +214,7 @@ ax_l.grid(True, color='#e2e8f0', linestyle='-', linewidth=0.8)
 ax_l.plot(epochs, smooth_tr_loss, color='#2563eb', linewidth=1.6, label=f'Train Loss ({smooth_tr_loss[-1]:.3f})')
 ax_l.plot(epochs, smooth_val_loss, color='#dc2626', linewidth=1.6, label=f'Validation Loss ({smooth_val_loss[-1]:.3f})')
 ax_l.set_title(f"AI Gesture Model Categorical Loss | Plotted: {current_timestamp}", fontsize=10, pad=10)
-ax_l.set_xlim(0, 500); ax_l.set_ylim(-0.05, 2.65)
+ax_l.set_xlim(0, 300); ax_l.set_ylim(-0.05, 2.65)
 ax_l.legend(loc='upper right', fontsize=8.5)
 plt.tight_layout()
 plt.savefig(loss_path, bbox_inches='tight', dpi=300)

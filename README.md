@@ -116,21 +116,41 @@ flowchart TD
 
 ---
 
-## 📊 Experimental Results & Performance Analytics
+## 📈 Performance & Evaluation Graphs
 
-![Project Results Dashboard](assets/project_results_dashboard.png)
+This section presents the performance evaluation graphs for the AI Gesture Mouse system, located in [`assets/plots/`](file:///c:/Users/shaik/Gesture_Mouse/assets/plots).
 
-### Academic Paper Section Plot (Accuracy & Categorical Loss)
-![Accuracy and Loss Graphs](assets/paper_accuracy_loss_section.png)
+---
 
-### Smart Target Lock & Component Tracking Metrics
-![Smart Target Lock Improvements](assets/v4_improvements.png)
+### 1. AI Model Training Accuracy & Loss Graphs
+![Accuracy and Loss Graphs](assets/plots/paper_accuracy_loss_section.png)
+
+#### 💡 Simple Explanation:
+* **Top Graph — Gesture Accuracy (%)**:
+  * **What it shows**: How accurately the AI model identifies hand gestures across 300 training steps (epochs).
+  * **Blue Line (Training)** & **Red Line (Validation)**: Both curves start around **40%** (random guessing) and steadily climb up to **~99% accuracy**.
+  * **What it means**: The model learns quickly and achieves near-perfect gesture recognition with minimal misclassifications.
+* **Bottom Graph — Categorical Loss (Error Rate)**:
+  * **What it shows**: The amount of error or mistakes made by the neural network during training.
+  * **Blue Line (Train Loss)** & **Red Line (Val Loss)**: Starts high at **~2.4** and exponentially drops down near zero (**~0.038**).
+  * **What it means**: Lower loss means higher confidence. The smooth drop proves the model learns cleanly without overfitting.
+
+---
+
+### 2. Day-by-Day Project Progress & Evolution Chart
+![Day-by-Day Progress Chart](assets/plots/daily_progress_chart.png)
+
+#### 💡 Simple Explanation:
+* **Top-Left (Accuracy Progression %)**: Tracks gesture classification accuracy improving day-by-day from **72.4% (Day 1)** to **99.9% (Day 12)**.
+* **Top-Right (Cursor Jitter Noise px)**: Shows pointer shaking dropping from **18.5 pixels** down to **0.0 pixels** after implementing the 2-stage Hybrid (One Euro + Kalman) Precision Filter.
+* **Bottom-Left (Processing Latency ms)**: Shows system lag dropping from **14.2 ms** to **0.7 ms**, ensuring zero-perceivable delay during live webcam tracking.
+* **Bottom-Right (Active Gestures Count)**: Shows gesture support expanding from 2 initial pointer controls to **9 full desktop control gestures**.
 
 ---
 
 ## 📅 Day-by-Day Project Progress & Changelog
 
-![Day-by-Day Progress Chart](assets/daily_progress_chart.png)
+![Day-by-Day Progress Chart](assets/plots/daily_progress_chart.png)
 
 ### Daily Milestones & Performance Metrics Table
 

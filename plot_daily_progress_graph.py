@@ -6,7 +6,7 @@ from datetime import datetime
 current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # Output directory
-output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "plots")
 os.makedirs(output_dir, exist_ok=True)
 
 daily_chart_path = os.path.join(output_dir, "daily_progress_chart.png")
