@@ -1,16 +1,19 @@
 """
 AI Gesture Mouse - Gesture Dataset Collector & Neural Network Model Trainer
 Collects MediaPipe 3D hand landmark coordinates (21 landmarks * 3 = 63 features) from your webcam,
-trains a Deep Neural Network (MLP) gesture classifier across 500 epochs, and plots the exact 
+trains a Deep Neural Network (MLP) gesture classifier across 100 epochs, and plots the exact 
 Training/Validation Accuracy and Loss curves.
 
-Supported Gesture Classes (6 Classes):
+Supported Gesture Classes (9 Classes):
 0: Move Cursor (Index Pointing)
-1: Left Click (Index Pinch)
-2: Right Click (Middle Pinch)
-3: Scroll (Index + Middle Side-by-Side)
-4: Zoom In (Open Palm Wide)
-5: Zoom Out (Closed Fist)
+1: Drag & Drop (Pinch)
+2: Left Click (Peace Sign)
+3: Right Click (L-Shape)
+4: Double Click (Thumb Only)
+5: Scroll (Open Palm)
+6: Zoom (Rock Sign)
+7: Close Window (Pinky Extended)
+8: Idle (Closed Fist)
 """
 
 import cv2
@@ -38,16 +41,19 @@ class GestureDataCollector:
         
         self.classes = {
             '0': 'MOVE_CURSOR',
-            '1': 'LEFT_CLICK',
-            '2': 'RIGHT_CLICK',
-            '3': 'SCROLL',
-            '4': 'ZOOM_IN',
-            '5': 'ZOOM_OUT'
+            '1': 'DRAG_DROP',
+            '2': 'LEFT_CLICK',
+            '3': 'RIGHT_CLICK',
+            '4': 'DOUBLE_CLICK',
+            '5': 'SCROLL',
+            '6': 'ZOOM',
+            '7': 'CLOSE_WINDOW',
+            '8': 'IDLE_FIST'
         }
 
     def collect_data(self, samples_per_class=200):
         print("=== AI GESTURE DATA COLLECTOR ===")
-        print("Prepare your webcam. Press keys 0 to 5 to record samples for each gesture class:")
+        print("Prepare your webcam. Press keys 0 to 8 to record samples for each gesture class:")
         for k, v in self.classes.items():
             print(f"  Key '{k}': {v}")
         print("  Press 'q' to finish collection.")
@@ -79,7 +85,7 @@ class GestureDataCollector:
                     features.extend([lm.x - wrist.x, lm.y - wrist.y, lm.z - wrist.z])
                 curr_features = features
             
-            cv2.putText(frame, "Press 0-5 to record class | 'q' to quit", (20, 30),
+            cv2.putText(frame, "Press 0-8 to record class | 'q' to quit", (20, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             cv2.imshow("Gesture Dataset Collector", frame)
             
@@ -100,7 +106,7 @@ class GestureDataCollector:
             np.save(os.path.join(self.dataset_dir, "y_gestures.npy"), np.array(labels))
             print(f"✓ Saved dataset with {len(data)} samples to {self.dataset_dir}/")
 
-def train_model(epochs=300):
+def train_model(epochs=100):
     dataset_dir = "dataset"
     x_path = os.path.join(dataset_dir, "X_gestures.npy")
     y_path = os.path.join(dataset_dir, "y_gestures.npy")
@@ -114,8 +120,17 @@ def train_model(epochs=300):
     y = np.load(y_path)
     
     print(f"Loaded dataset: X shape {X.shape}, y shape {y.shape}")
+    
+    # Correctly and reproducibly shuffle the dataset before splitting
+    # This ensures the 20% validation split contains all 9 gesture classes
+    rng = np.random.RandomState(42)
+    indices = np.arange(X.shape[0])
+    rng.shuffle(indices)
+    X = X[indices]
+    y = y[indices]
+    
     num_classes = len(np.unique(y))
-    y_cat = to_categorical(y, num_classes=6)
+    y_cat = to_categorical(y, num_classes=9)
     
     if HAS_TF:
         model = Sequential([
@@ -126,16 +141,21 @@ def train_model(epochs=300):
             BatchNormalization(),
             Dropout(0.2),
             Dense(32, activation='relu'),
-            Dense(6, activation='softmax')
+            Dense(9, activation='softmax')
         ])
         
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        print("Training Gesture Classifier over 300 epochs...")
+        print("Training Gesture Classifier over 100 epochs...")
         history = model.fit(X, y_cat, epochs=epochs, batch_size=32, validation_split=0.2)
         model.save("gesture_model.h5")
+        
+        # Save the real training history for plot_accuracy_loss.py to use
+        np.save(os.path.join(dataset_dir, "training_history.npy"), history.history)
         print("✓ Trained model saved to gesture_model.h5")
+        print(f"✓ Real training history saved to {dataset_dir}/training_history.npy")
 
 if __name__ == "__main__":
-    collector = GestureDataCollector()
-    # collector.collect_data()  # Uncomment to record live webcam gesture samples
-    train_model(epochs=300)
+    # We do not need MediaPipe initialized just for training
+    # collector = GestureDataCollector()
+    # collector.collect_data()  # Commented out since dataset is already recorded
+    train_model(epochs=100)

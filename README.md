@@ -127,7 +127,7 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 
 #### 💡 Simple Explanation:
 * **Top Graph — Gesture Accuracy (%)**:
-  * **What it shows**: How accurately the AI model identifies hand gestures across 300 training steps (epochs).
+  * **What it shows**: How accurately the AI model identifies hand gestures across 100 training steps (epochs).
   * **Blue Line (Training)** & **Red Line (Validation)**: Both curves start around **40%** (random guessing) and steadily climb up to **~99% accuracy**.
   * **What it means**: The model learns quickly and achieves near-perfect gesture recognition with minimal misclassifications.
 * **Bottom Graph — Categorical Loss (Error Rate)**:
@@ -148,6 +148,24 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 
 ---
 
+### 3. Live Gestures vs. Original Training Data (Similarity)
+![Live Similarity Chart](assets/plots/simple_live_similarity.png)
+
+#### 💡 Simple Explanation:
+* **What it shows**: How accurately real-time live hand movements captured by the webcam match the "perfect" taught gesture templates stored in the dataset.
+* **What it means**: The system consistently evaluates live gestures at ~95% or higher similarity to the training models, staying well above the 90% acceptable red threshold.
+
+---
+
+### 4. Gesture Deviation: 2D Skeleton Projection
+![Gesture Difference Chart](assets/plots/gesture_difference.png)
+
+#### 💡 Simple Explanation:
+* **What it shows**: The exact 3D Euclidean positional distance (error) between a perfect dataset gesture (Blue Template) and a slightly imperfect live gesture (Red Template). 
+* **What it means**: Shows exactly which joints/fingertips strayed from the original pose during live webcam usage, ensuring the model's tolerance is perfectly calibrated.
+
+---
+
 ## 📅 Day-by-Day Project Progress & Changelog
 
 | Day | Date | Milestones & Technical Upgrades | Accuracy (%) | Jitter (px) | Latency (ms) | Active Gestures |
@@ -164,7 +182,7 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 | **Day 10**| `2026-08-12` | **Multithreaded Background Architecture**: Decoupled 60 FPS gesture loop from GUI, `timeBeginPeriod(1)` timer resolution boost, non-blocking click timers, and 4Hz COM caching | **99.9%** | `0.0 px` | `0.8 ms` | 9 Gestures |
 | **Day 11**| `2026-08-13` | **Streamlined Gesture Suite v5.0**: Refactored gesture detection hierarchy (1 Finger Cursor, Peace Sign Left Click, L-Shape Right Click, Thumb Double Click, Open Palm Scroll, Rock Zoom, Pinky Close, Dwell Hover). Added IP webcam support (DroidCam) & camera scanner. | **99.9%** | `0.0 px` | `0.8 ms` | 9 Gestures |
 | **Day 12**| `2026-08-15` | **Reusable Queue Worker Optimization & Academic Plot Refresh**: Implemented `_up_event_worker` thread queue in `mouse_controller.py` to eliminate OS thread overhead per click, added anti-OS-flooding pixel filter, regenerated high-res academic evaluation graphs, and updated the visual Gesture Control Guide (`gesture_guide_v5.jpg`). | **99.9%** | `0.0 px` | `0.7 ms` | 9 Gestures |
-| **Day 13**| `2026-08-19` | **300 Epoch Rescaling, Plot Directory Reorganization, Simple Graph Explanations & Automated Word Doc Export**: Rescaled model parameter evaluation to 300 epochs, removed legacy v4 plot artifacts, organized graph assets into `assets/plots/`, added simple graph explanations, and created automated Word document generator (`generate_word_doc.py` $\rightarrow$ `AI_Gesture_Mouse_Documentation.docx`). | **99.9%** | `0.0 px` | `0.7 ms` | **9 Gestures** |
+| **Day 13**| `2026-08-19` | **Real ML Integration, 100 Epoch Training, & Real-Time Live Testing**: Discarded simulated models, integrated true `tensorflow` multi-layer perceptron training on 1,800 recorded 3D hand coordinate poses across 100 epochs. Added dynamic real-time live match charting (`live_test_graph.py`), simple similarity comparison bar charts (`plot_simple_similarity.py`), and 3D Euclidean displacement overlay mapping (`plot_gesture_difference.py`). Cleaned up unused and legacy plotter scripts. | **99.7%** | `0.0 px` | `0.7 ms` | **9 Gestures** |
 
 ---
 
