@@ -150,10 +150,6 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 
 ## 📅 Day-by-Day Project Progress & Changelog
 
-![Day-by-Day Progress Chart](assets/plots/daily_progress_chart.png)
-
-### Daily Milestones & Performance Metrics Table
-
 | Day | Date | Milestones & Technical Upgrades | Accuracy (%) | Jitter (px) | Latency (ms) | Active Gestures |
 |---|---|---|---|---|---|---|
 | **Day 1** | `2026-07-28` | Baseline MediaPipe hand tracking & PyAutoGUI pointer control | **72.4%** | `18.5 px` | `14.2 ms` | 2 Gestures |
