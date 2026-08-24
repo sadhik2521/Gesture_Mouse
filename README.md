@@ -85,6 +85,59 @@ flowchart TD
 
 ---
 
+## 📐 Hand Gesture Feature Extraction & Mathematical Formulas
+
+The system converts raw webcam video into mouse controls using real-time 3D landmark extraction, coordinate normalization, Euclidean distance calculation, and neural network classification:
+
+### 1. 3D Hand Landmark Extraction
+MediaPipe detects **21 3D hand keypoints** $(x_i, y_i, z_i)$ for $i = 0, 1, \dots, 20$.
+- **Landmark 0**: Wrist (Base reference point)
+- **Landmarks 4, 8, 12, 16, 20**: Fingertips (Thumb, Index, Middle, Ring, Pinky)
+- **Landmarks 1, 5, 9, 13, 17**: Knuckle / MCP Joints
+
+### 2. Relative Translation Normalization (Position Invariance)
+To ensure gestures are recognized anywhere on the screen regardless of hand position, coordinates are calculated relative to the **Wrist** $(x_0, y_0, z_0)$:
+
+$$\Delta x_i = x_i - x_0, \quad \Delta y_i = y_i - y_0, \quad \Delta z_i = z_i - z_0$$
+
+This forms a **63-dimensional feature vector**:
+
+$$V = [\Delta x_0, \Delta y_0, \Delta z_0, \, \Delta x_1, \Delta y_1, \Delta z_1, \, \dots, \, \Delta x_{20}, \Delta y_{20}, \Delta z_{20}]$$
+
+### 3. Dynamic Hand Scale Normalization
+To keep tracking consistent whether your hand is near or far from the webcam, hand size $S_{\text{hand}}$ is calculated using the 2D Euclidean distance from Wrist to Middle Knuckle:
+
+$$S_{\text{hand}} = \sqrt{(x_{\text{Middle\_MCP}} - x_0)^2 + (y_{\text{Middle\_MCP}} - y_0)^2}$$
+
+### 4. Pinch & Click Distance Formula
+To detect pinch gestures (e.g., Click, Drag & Drop), the Euclidean distance $d_{\text{pinch}}$ between Index Tip $(x_8, y_8)$ and Thumb Tip $(x_4, y_4)$ is computed:
+
+$$d_{\text{pinch}} = \sqrt{(x_8 - x_4)^2 + (y_8 - y_4)^2}$$
+
+$$\text{Pinch Active} \iff d_{\text{pinch}} < \text{Threshold}_{\text{click}} \times S_{\text{hand}}$$
+
+### 5. Finger Extension Ratio Formula
+Determines whether a finger is extended (straight) or curled (bent) by comparing tip-to-wrist distance against knuckle-to-wrist distance:
+
+$$d_{\text{tip}} = \sqrt{(x_{\text{Tip}} - x_0)^2 + (y_{\text{Tip}} - y_0)^2}$$
+$$d_{\text{base}} = \sqrt{(x_{\text{MCP}} - x_0)^2 + (y_{\text{MCP}} - y_0)^2}$$
+
+$$\text{Is Extended} \iff \frac{d_{\text{tip}}}{d_{\text{base}}} > 1.05$$
+
+### 6. Neural Network Classification Formula
+The 63 normalized coordinates $V$ are processed by a Multi-Layer Perceptron (MLP) trained with TensorFlow:
+
+$$\hat{y} = \text{Softmax}\Big(W_2 \cdot \text{ReLU}(W_1 \cdot V + b_1) + b_2\Big)$$
+
+### 7. Live Gesture Similarity Score
+For real-time testing (`live_test_graph.py`), similarity between live features $V_{\text{live}}$ and template $V_{\text{template}}$ is calculated using Euclidean distance and exponential decay:
+
+$$D = \sqrt{\sum_{k=1}^{63} \big(V_{\text{live}, k} - V_{\text{template}, k}\big)^2}$$
+
+$$\text{Similarity (\%)} = e^{-\lambda \cdot D} \times 100$$
+
+---
+
 ## 🔑 Key Technical Innovations
 
 ### 1. Dual-Threaded Asynchronous Architecture
@@ -155,14 +208,6 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 * **What it shows**: How accurately real-time live hand movements captured by the webcam match the "perfect" taught gesture templates stored in the dataset.
 * **What it means**: The system consistently evaluates live gestures at ~95% or higher similarity to the training models, staying well above the 90% acceptable red threshold.
 
----
-
-### 4. Gesture Deviation: 2D Skeleton Projection
-![Gesture Difference Chart](assets/plots/gesture_difference.png)
-
-#### 💡 Simple Explanation:
-* **What it shows**: The exact 3D Euclidean positional distance (error) between a perfect dataset gesture (Blue Template) and a slightly imperfect live gesture (Red Template). 
-* **What it means**: Shows exactly which joints/fingertips strayed from the original pose during live webcam usage, ensuring the model's tolerance is perfectly calibrated.
 
 ---
 

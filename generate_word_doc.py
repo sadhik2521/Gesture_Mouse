@@ -194,6 +194,28 @@ def create_documentation_docx():
 
     doc.add_paragraph() # Spacer
 
+    # Mathematical Formulas Section
+    add_heading_2("3.1. Hand Gesture Feature Extraction & Mathematical Formulas")
+    doc.add_paragraph("The system converts raw webcam video into mouse controls using real-time 3D landmark extraction, coordinate normalization, Euclidean distance calculation, and neural network classification:")
+
+    formulas = [
+        ("1. 3D Hand Landmark Extraction: ", "MediaPipe detects 21 3D hand keypoints (x_i, y_i, z_i) for i = 0 to 20. Landmark 0 is the Wrist reference point, Landmarks 4, 8, 12, 16, 20 are Fingertips, and 1, 5, 9, 13, 17 are Knuckle (MCP) joints."),
+        ("2. Relative Translation Normalization: ", "To ensure position-invariance anywhere on screen, coordinates are calculated relative to Wrist (Landmark 0): Δx_i = x_i - x_0, Δy_i = y_i - y_0, Δz_i = z_i - z_0. This constructs a 63-dimensional feature vector V = [Δx_0, Δy_0, Δz_0, ..., Δx_20, Δy_20, Δz_20]."),
+        ("3. Dynamic Hand Scale Normalization: ", "Hand scale S_hand is calculated using 2D Euclidean distance from Wrist to Middle Knuckle: S_hand = sqrt((x_Middle_MCP - x_0)^2 + (y_Middle_MCP - y_0)^2), keeping tracking consistent regardless of camera distance."),
+        ("4. Pinch & Click Distance Formula: ", "Euclidean distance d_pinch between Index Tip and Thumb Tip is computed: d_pinch = sqrt((x_8 - x_4)^2 + (y_8 - y_4)^2). Pinch is active when d_pinch < Threshold_click * S_hand."),
+        ("5. Finger Extension Ratio Formula: ", "Determines straight vs. bent fingers by comparing tip-to-wrist distance against knuckle-to-wrist distance: d_tip = sqrt((x_Tip - x_0)^2 + (y_Tip - y_0)^2), d_base = sqrt((x_MCP - x_0)^2 + (y_MCP - y_0)^2). Finger is extended if (d_tip / d_base) > 1.05."),
+        ("6. Neural Network Classification Formula: ", "The 63 normalized coordinates V are processed by a Multi-Layer Perceptron (MLP): y_hat = Softmax(W2 * ReLU(W1 * V + b1) + b2)."),
+        ("7. Live Gesture Similarity Score: ", "Euclidean distance D = sqrt(sum(V_live,k - V_template,k)^2) is converted into Similarity % = exp(-lambda * D) * 100.")
+    ]
+    for ftitle, fdesc in formulas:
+        p = doc.add_paragraph(style='List Bullet')
+        bp = p.add_run(ftitle)
+        bp.bold = True
+        bp.font.color.rgb = NAVY
+        p.add_run(fdesc)
+
+    doc.add_paragraph() # Spacer
+
     # ══════════════════════════════════════════════════════════════════════════
     # 4. PERFORMANCE & EVALUATION GRAPHS (WITH EMBEDDED IMAGES)
     # ══════════════════════════════════════════════════════════════════════════
@@ -266,25 +288,6 @@ def create_documentation_docx():
         p.add_run(btitle).bold = True
         p.add_run(bdesc)
 
-    doc.add_paragraph() # Spacer
-
-    # Graph 4: Gesture Difference Projection
-    add_heading_2("4.4. Gesture Deviation: 2D Skeleton Projection")
-    diff_img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "plots", "gesture_difference.png")
-    if os.path.exists(diff_img_path):
-        p_img = doc.add_paragraph()
-        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_img.add_run().add_picture(diff_img_path, width=Inches(5.5))
-
-    add_heading_3("💡 Simple Explanation:")
-    diff_bullets = [
-        ("What it shows: ", "The exact 3D Euclidean positional distance (error) between a perfect dataset gesture (Blue Template) and a slightly imperfect live gesture (Red Template)."),
-        ("What it means: ", "Shows exactly which joints/fingertips strayed from the original pose during live webcam usage, ensuring the model's tolerance is perfectly calibrated.")
-    ]
-    for btitle, bdesc in diff_bullets:
-        p = doc.add_paragraph(style='List Bullet')
-        p.add_run(btitle).bold = True
-        p.add_run(bdesc)
 
     doc.add_page_break()
 
