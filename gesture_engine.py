@@ -3,6 +3,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import math
+import os
 import time
 import threading
 import uiautomation as auto
@@ -458,8 +459,20 @@ class GestureEngine:
         self._rclick_frames  = 0   # consecutive frames Peace-Sign held
         self._dclick_frames  = 0   # consecutive frames Thumb-only held
         self._close_frames   = 0   # consecutive frames Pinky-only held
-        self._click_debounce = 6   # ~100 ms @ 60 fps (tunable via GUI)
-        self._close_debounce = 18  # ~300 ms — longer to avoid accidental Alt+F4
+        self._click_debounce = 3   # 3 frames (~50ms) for snappy, responsive triggers
+        self._close_debounce = 12  # ~200 ms for safety close
+
+        self.gesture_names = {
+            0: "Move Cursor",
+            1: "Drag & Drop",
+            2: "Left Click",
+            3: "Right Click",
+            4: "Double Click",
+            5: "Scroll",
+            6: "Zoom",
+            7: "Close Window",
+            8: "Idle"
+        }
 
         # ── Index-finger bend left-click (edge-triggered, fires ONCE per bend) ─
         # The gesture fires on the FALLING EDGE only: straight → bent transition.
@@ -474,6 +487,28 @@ class GestureEngine:
         self._ema_x = None
         self._ema_y = None
         self._ema_alpha = 0.35   # lower = smoother history reference
+
+        # ── Learned Dataset Gesture Templates ─────────────────────────────
+        self.templates = {}
+        self.load_dataset_templates()
+
+    def load_dataset_templates(self, dataset_dir="dataset"):
+        """Load mathematical gesture templates directly from the dataset."""
+        x_path = os.path.join(dataset_dir, "X_gestures.npy")
+        y_path = os.path.join(dataset_dir, "y_gestures.npy")
+        if os.path.exists(x_path) and os.path.exists(y_path):
+            try:
+                X = np.load(x_path)
+                y = np.load(y_path)
+                templates = {}
+                for i in range(9):
+                    samples = X[y == i]
+                    if len(samples) > 0:
+                        templates[i] = np.mean(samples, axis=0)
+                self.templates = templates
+                print(f"[GestureEngine] Successfully loaded {len(self.templates)} learned gesture templates from {dataset_dir}/")
+            except Exception as e:
+                print(f"[GestureEngine] Warning loading dataset templates: {e}")
 
     # ── Drawing helpers ────────────────────────────────────────────────────
 
@@ -675,26 +710,53 @@ class GestureEngine:
             ring_clearly_ext   = clearly_extended((x_ring,  y_ring),  (x_ring_mcp,  y_ring_mcp),  wrist_xy)
             pinky_clearly_ext  = clearly_extended((x_pinky, y_pinky), (x_pinky_mcp, y_pinky_mcp), wrist_xy)
 
-            # CLOSE WINDOW: pinky only (shaka sign)
-            # Uses clearly_extended for blocking — partially raised fingers won't prevent close.
-            is_close_pose  = pinky_ext and not index_clearly_ext and not middle_clearly_ext and not ring_clearly_ext
+            # ── Dynamic Gesture Template Matching (from Dataset) ──────────
+            matched_gesture_id = None
+            matched_sim = 0.0
+            if self.templates:
+                wrist_pt = hand_lms.landmark[0]
+                live_features = []
+                for pt in hand_lms.landmark:
+                    live_features.extend([pt.x - wrist_pt.x, pt.y - wrist_pt.y, pt.z - wrist_pt.z])
+                live_arr = np.array(live_features, dtype=np.float32)
 
-            # LEFT CLICK: Index + Middle (Peace Sign ✌️).
-            # Only ring/pinky that are CLEARLY extended (ratio 1.45) block this gesture.
-            is_lclick_pose = index_ext and middle_ext and not ring_clearly_ext and not pinky_clearly_ext
+                best_gid = None
+                highest_sim = 0.0
+                for gid, tmpl in self.templates.items():
+                    dist = float(np.linalg.norm(tmpl - live_arr))
+                    sim = math.exp(-dist * 4.5) * 100.0
+                    if sim > highest_sim:
+                        highest_sim = sim
+                        best_gid = gid
+                if highest_sim >= 35.0:
+                    matched_gesture_id = best_gid
+                    matched_sim = highest_sim
 
-            # RIGHT CLICK: Thumb + Index L-Shape / Gun 👉.
-            # Same logic — only clearly-extended fingers suppress it.
-            is_rclick_pose = thumb_ext and index_ext and not middle_ext and not ring_clearly_ext and not pinky_clearly_ext
-            
-            # DOUBLE CLICK: Thumb Only.
-            # Index & Middle must be folded so it doesn't overlap with Right/Left click.
-            is_dclick_pose = thumb_ext and not index_ext and not middle_ext and not all_open
+            if matched_gesture_id is not None:
+                # ── Dynamic Template from Dataset has 100% PRIORITY ──
+                is_strict_tracking = (matched_gesture_id == 0)
+                is_left_pinched    = (matched_gesture_id == 1)
+                is_lclick_pose     = (matched_gesture_id == 2)
+                is_rclick_pose     = (matched_gesture_id == 3)
+                is_dclick_pose     = (matched_gesture_id == 4)
+                is_scroll_pose     = (matched_gesture_id == 5)
+                is_zoom_pose       = (matched_gesture_id == 6)
+                is_close_pose      = (matched_gesture_id == 7)
+                all_folded         = (matched_gesture_id == 8)
 
-            # STRICT TRACKING: Cursor ONLY moves if ONLY the index finger is extended.
-            # This completely solves the jitter because the moment you start opening 
-            # another finger for a click, tracking is frozen!
-            is_strict_tracking = index_ext and not middle_ext and not ring_ext and not pinky_ext and not thumb_ext
+                # Show live on-screen match badge matching live_test_graph.py
+                g_text = f"AI: {self.gesture_names.get(matched_gesture_id, '')} ({int(matched_sim)}%)"
+                cv2.putText(frame, g_text, (20, h - 25),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 120), 2, cv2.LINE_AA)
+            else:
+                # Geometric fallback when hand is outside dataset range
+                is_close_pose  = pinky_ext and not index_clearly_ext and not middle_clearly_ext and not ring_clearly_ext
+                is_lclick_pose = index_ext and middle_ext and not ring_clearly_ext and not pinky_clearly_ext
+                is_rclick_pose = thumb_ext and index_ext and not middle_ext and not ring_clearly_ext and not pinky_clearly_ext
+                is_dclick_pose = thumb_ext and not index_ext and not middle_ext and not all_open
+                is_scroll_pose = index_ext and middle_ext and ring_ext and pinky_ext
+                is_zoom_pose   = index_ext and pinky_ext and not middle_ext and not ring_ext
+                is_strict_tracking = index_ext and not middle_ext and not ring_ext and not pinky_ext and not thumb_ext
 
             four_folded = all_folded
 
@@ -814,8 +876,9 @@ class GestureEngine:
                 cv2.circle(frame, (mid_x, mid_y), 12, (0, 255, 255), 2, cv2.LINE_AA)
 
             # ═══ GESTURE LOGIC ═══════════════════════════════════════════════
-            is_scroll_pose = index_ext and middle_ext and ring_ext and pinky_ext
-            is_zoom_pose   = index_ext and pinky_ext and not middle_ext and not ring_ext
+            if matched_gesture_id is None:
+                is_scroll_pose = index_ext and middle_ext and ring_ext and pinky_ext
+                is_zoom_pose   = index_ext and pinky_ext and not middle_ext and not ring_ext
             # Note: is_rclick_pose (peace sign) already computed above before cursor freeze
 
             # --- GESTURE 1: SCROLL UP / DOWN (🖐 Open Palm) ---
