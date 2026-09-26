@@ -20,3 +20,20 @@ python-pptx>=0.6.21
 
 # Optional Machine Learning Model Retraining
 # tensorflow>=2.15.0
+
+# 1. Launch the Application
+python main.py
+
+# 2. Gesture Dataset & Model Tools
+python gestures/train_gesture_model.py --collect
+python gestures/train_gesture_model.py --train
+python gestures/live_test_graph.py
+
+# 3. Regenerate Plots (Outputs to results/plots/)
+python scripts/plot_accuracy_loss.py
+python scripts/plot_daily_progress_graph.py
+python scripts/plot_simple_similarity.py
+
+# 4. Regenerate Reports & Slides (Outputs to results/documents/)
+python scripts/build_full_project_word_doc.py
+python scripts/generate_powerpoint_presentation.py
