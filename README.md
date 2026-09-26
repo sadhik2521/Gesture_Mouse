@@ -265,123 +265,234 @@ python main.py
 
 ---
 
+
 ## 📁 Project Directory Structure
 
-\Gesture_Mouse/
-├── main.py                       # Root application entry point
-├── README.md                     # Project documentation & overview
-├── requirements.txt              # Production dependency specifications
+```text
+Gesture_Mouse/
+├── main.py                             # Root application entry point
+├── README.md                           # Project documentation & overview
+├── requirements.txt                    # Production dependency specifications
+├── .gitignore                          # Ignores temp files, caches & build artifacts
 │
-├── gestures/                     # All gesture tracking, recognition & control modules
-│   ├── __init__.py               # Gestures package exports
-│   ├── gesture_engine.py         # Core gesture tracking, One Euro & Kalman filter cascade
-│   ├── mouse_controller.py       # High-speed Win32 SendInput kernel mouse controller
-│   ├── train_gesture_model.py    # Gesture dataset collector & Neural Network trainer
-│   ├── live_test_graph.py        # Real-time gesture similarity match chart
-│   └── gesture_model.h5          # Trained Deep Neural Network weights
+├── gestures/                           # 🖐️ All gesture tracking, recognition & control modules
+│   ├── __init__.py                     # Gestures package exports
+│   ├── gesture_engine.py               # Core gesture tracking, One Euro & Kalman filter cascade
+│   ├── mouse_controller.py             # High-speed Win32 SendInput kernel mouse controller
+│   ├── train_gesture_model.py          # Gesture dataset collector & Neural Network trainer
+│   ├── live_test_graph.py              # Real-time gesture similarity match chart
+│   └── gesture_model.h5                # Trained Deep Neural Network weights
 │
-├── gui/                          # Graphical user interface layer
-│   ├── __init__.py               # GUI package exports
-│   └── gui.py                    # Modern CustomTkinter dark-themed control dashboard
+├── gui/                                # 🖥️ Graphical user interface layer
+│   ├── __init__.py                     # GUI package exports
+│   └── gui.py                          # Modern CustomTkinter dark-themed control dashboard
 │
-├── dataset/                      # Feature matrices and dataset tables
-│   ├── gestures_data.csv         # Full labeled 63-coordinate landmark table (1,800 samples)
-│   ├── gestures_data_raw.csv     # Raw captured hand landmark data
-│   ├── gestures_labels.csv       # Gesture class IDs and labels
-│   ├── gesture_averages_reference.csv # Mathematical gesture template centroids
-│   ├── X_gestures.npy            # NumPy feature matrix (N, 63)
-│   ├── y_gestures.npy            # NumPy class labels (N,)
-│   └── training_history.npy      # Model training loss & accuracy history
+├── dataset/                            # 💾 Feature matrices and dataset tables
+│   ├── gestures_data.csv               # Full labeled 63-coordinate landmark table (1,800 samples)
+│   ├── gestures_data_raw.csv           # Raw captured hand landmark data
+│   ├── gestures_labels.csv             # Gesture class IDs and labels
+│   ├── gesture_averages_reference.csv  # Mathematical gesture template centroids
+│   ├── X_gestures.npy                  # NumPy feature matrix (N, 63)
+│   ├── y_gestures.npy                  # NumPy class labels (N,)
+│   └── training_history.npy            # Model training loss & accuracy history
 │
-├── results/                      # All output results files
-│   ├── plots/                    # Evaluation & benchmark plots
+├── results/                            # 📊 All output results files
+│   ├── plots/                          # Evaluation & benchmark plots
 │   │   ├── accuracy_graph.png
 │   │   ├── loss_graph.png
 │   │   ├── paper_accuracy_loss_section.png
 │   │   ├── daily_progress_chart.png
 │   │   └── simple_live_similarity.png
-│   └── documents/                # Generated reports & presentations
+│   └── documents/                      # Generated reports & presentations
 │       ├── AI_Gesture_Mouse_Full_Documentation.docx
 │       ├── AI_Gesture_Mouse_Documentation.docx
 │       ├── AI_Gesture_Mouse_PPT_Detailed_Guide.docx
 │       └── AI_Gesture_Mouse_Presentation.pptx
 │
-├── scripts/                      # Analysis, plotting & document generation tools
+├── scripts/                            # ⚙️ Analysis, plotting & document generation tools
 │   ├── __init__.py
-│   ├── plot_accuracy_loss.py     # Plots publication-ready accuracy & loss curves
-│   ├── plot_daily_progress_graph.py # Plots day-by-day 4-panel evolution charts
-│   ├── plot_simple_similarity.py # Plots live hand similarity match scores
-│   ├── create_gesture_guide_image.py # Generates gesture reference posters
-│   ├── build_full_project_word_doc.py # Generates comprehensive technical documentation
-│   ├── generate_word_doc.py      # Generates project Word report
+│   ├── plot_accuracy_loss.py           # Plots publication-ready accuracy & loss curves
+│   ├── plot_daily_progress_graph.py    # Plots day-by-day 4-panel evolution charts
+│   ├── plot_simple_similarity.py       # Plots live hand similarity match scores
+│   ├── create_gesture_guide_image.py   # Generates gesture reference posters
+│   ├── build_full_project_word_doc.py  # Generates comprehensive technical documentation
+│   ├── generate_word_doc.py            # Generates project Word report
 │   ├── generate_powerpoint_presentation.py # Generates complete slide deck
 │   └── generate_ppt_detailed_guide_doc.py  # Generates presentation guide
 │
-├── assets/                       # Static media, poster art & UI screenshots
+├── assets/                             # 🖼️ Static media, poster art & UI screenshots
 │   ├── gesture_signs_poster.jpg
+│   ├── gesture_guide_v5.jpg
 │   └── ui_dashboard.jpg
 │
-└── docs/                         # Extended Markdown documentation
-    └── PROJECT_DOCUMENTATION.md  # Detailed technical specifications & viva prep
-\
+└── docs/                               # 📖 Extended Markdown documentation
+    └── PROJECT_DOCUMENTATION.md        # Detailed technical specifications & viva prep
+```
+
+---
+
+## 🖐️ How to Collect and Change Gesture Samples
+
+The AI Gesture Mouse dataset contains 63-dimensional normalized vectors (21 3D hand landmarks $\times$ [x, y, z] relative to the wrist). You can collect new samples, replace specific gestures, or fine-tune existing coordinates using the commands below:
+
+### Gesture Classes & Key Reference Table
+
+| Class ID | Key | Gesture Name | Hand Pose Description | Action Triggered |
+| :---: | :---: | :--- | :--- | :--- |
+| **0** | `0` | `MOVE_CURSOR` | Index finger extended alone | Smooth cursor translation |
+| **1** | `1` | `DRAG_DROP` | Index fingertip & thumb pinched | Mouse drag & hold / open to release |
+| **2** | `2` | `LEFT_CLICK` | Index & middle fingers extended (Peace Sign) | Instant single left click |
+| **3** | `3` | `RIGHT_CLICK` | Thumb & index extended (L-shape / Gun) | Context menu right click with freeze |
+| **4** | `4` | `DOUBLE_CLICK` | Thumb pointing upwards alone | Fast double left click |
+| **5** | `5` | `SCROLL` | Open palm (all 5 fingers spread) | Slide UP to scroll up, DOWN to scroll down |
+| **6** | `6` | `ZOOM` | Index & pinky fingers extended (Rock Sign) | Slide UP to Zoom In, DOWN to Zoom Out |
+| **7** | `7` | `CLOSE_WINDOW` | Pinky extended alone (Shaka Sign) | 300ms safety hold $\rightarrow$ `Alt + F4` |
+| **8** | `8` | `IDLE_FIST` | Closed fist (all fingers folded) | Neutral / idle state (no action) |
+
+---
+
+### Method 1: Collect a Brand-New Dataset from Scratch
+
+To record fresh samples for all 9 gestures using your webcam:
+
+```bash
+python gestures/train_gesture_model.py --collect
+```
+
+**Step-by-Step Instructions:**
+1. Position your hand comfortably within the webcam feed.
+2. Form the target gesture pose (e.g., extend Index finger for `MOVE_CURSOR`).
+3. **Press the corresponding number key (`0` through `8`)** on your keyboard to capture samples. Each press records a normalized 63-feature landmark vector.
+4. Record approximately **200 samples per class** across different angles and distances.
+5. Press **`q`** to finish and save.
+6. The script automatically updates `dataset/X_gestures.npy` and `dataset/y_gestures.npy`, and auto-generates `dataset/gestures_data.csv` and `dataset/gesture_averages_reference.csv`.
+
+---
+
+### Method 2: Change / Replace a Specific Gesture
+
+If a specific gesture needs improvement or you want to map a custom hand sign, you can replace **only that single gesture class** without affecting any other recorded gestures:
+
+```bash
+# General Syntax:
+python gestures/train_gesture_model.py --replace-gesture <CLASS_ID>
+
+# Example 1: Re-record Right Click (Class 3)
+python gestures/train_gesture_model.py --replace-gesture 3
+
+# Example 2: Re-record Left Click (Class 2)
+python gestures/train_gesture_model.py --replace-gesture 2
+
+# Example 3: Re-record Scroll (Class 5)
+python gestures/train_gesture_model.py --replace-gesture 5
+
+# Example 4: Re-record Drag & Drop (Class 1)
+python gestures/train_gesture_model.py --replace-gesture 1
+```
+
+**Step-by-Step Instructions:**
+1. Execute the command with your desired class ID (from `0` to `8`).
+2. The script retains all data for the other 8 classes and deletes only the selected class.
+3. A camera feed opens titled **`Replace Gesture: <NAME>`**.
+4. Show your new hand pose to the camera.
+5. **Hold down the SPACEBAR** to rapidly record samples (an on-screen counter tracks your count up to ~200 samples).
+6. Release the spacebar and press **`q`** to save.
+7. Both `.npy` arrays and `.csv` summary files are updated with the new samples.
+
+---
+
+### Method 3: Edit / Prune Samples via CSV Spreadsheet
+
+You can inspect, audit, or clean individual coordinates directly in Microsoft Excel, VS Code, or Python:
+
+1. Open `dataset/gestures_data.csv`.
+2. Inspect or delete outlier rows, or adjust coordinate values.
+3. Save the CSV file.
+4. Synchronize the changes back into the NumPy arrays by running:
+
+```bash
+python gestures/train_gesture_model.py --from-csv
+```
+
+---
+
+### Method 4: Retrain the Neural Network Model
+
+After collecting or modifying samples, retrain the Multi-Layer Perceptron (MLP) Neural Network:
+
+```bash
+# Train for 100 epochs (default)
+python gestures/train_gesture_model.py --train
+
+# Custom number of epochs (e.g., 150 epochs)
+python gestures/train_gesture_model.py --train --epochs 150
+```
+
+- Automatically performs reproducible 80/20 train/validation stratified splitting.
+- Trains the 4-layer deep neural network with Batch Normalization and Dropout regularization.
+- Saves the trained model weights to `gestures/gesture_model.h5`.
+- Saves real training loss and accuracy metrics to `dataset/training_history.npy`.
+
+---
+
+### Method 5: Validate and Test Gestures in Real Time
+
+To immediately test your newly recorded or modified gestures live on your webcam:
+
+```bash
+python gestures/live_test_graph.py
+```
+
+- Launches a split-screen camera feed with an interactive match chart on the right side.
+- Displays live Euclidean-distance similarity match percentages (0% to 100%) across all 9 classes simultaneously.
+- Highlights active matching gestures in green when exceeding confidence thresholds.
+- Press **`q`** in the camera window to quit.
+
 ---
 
 ## 🛠️ CLI Operations & Generator Scripts
 
 ### 1. Launch Virtual Mouse Application
-\\ash
+```bash
 python main.py
-\
-### 2. Dataset Collection & Gesture Model Training
-\\ash
-# Collect new gesture samples using webcam
-python gestures/train_gesture_model.py --collect
+```
 
-# Replace a single gesture pose (e.g., gesture ID 3)
-python gestures/train_gesture_model.py --replace-gesture 3
-
-# Synchronize edited gestures_data.csv into .npy matrices
-python gestures/train_gesture_model.py --from-csv
-
-# Train Deep Neural Network classifier
-python gestures/train_gesture_model.py --train --epochs 100
-
-# Launch Real-Time Gesture Similarity Match Meter
-python gestures/live_test_graph.py
-\
-### 3. Generate Evaluation Graphs (Saved to esults/plots/\)
-\\ash
-# Generate ML Model Accuracy & Loss Curves
+### 2. Generate Evaluation Graphs (Outputs to `results/plots/`)
+```bash
+# Generate Academic Accuracy & Categorical Loss Curves
 python scripts/plot_accuracy_loss.py
 
-# Generate Day-by-Day Progression Chart
+# Generate 4-Panel Day-by-Day Project Progress Chart
 python scripts/plot_daily_progress_graph.py
 
-# Generate Live Template Similarity Comparison
+# Generate Real-Time Template Match Similarity Chart
 python scripts/plot_simple_similarity.py
 
-# Generate Visual Gesture Signs Poster
+# Generate Visual Gesture Signs Reference Poster (Outputs to assets/)
 python scripts/create_gesture_guide_image.py
-\
-### 4. Generate Reports & Documentation (Saved to esults/documents/\)
-\\ash
+```
+
+### 3. Generate Reports & Presentations (Outputs to `results/documents/`)
+```bash
 # Generate Comprehensive Technical Word Documentation
 python scripts/build_full_project_word_doc.py
 
-# Generate Project Word Report
+# Generate Academic Word Documentation
 python scripts/generate_word_doc.py
 
-# Generate PowerPoint Presentation Slide Deck
+# Generate Complete PowerPoint Slide Deck
 python scripts/generate_powerpoint_presentation.py
 
 # Generate PowerPoint Viva & Presentation Guide
 python scripts/generate_ppt_detailed_guide_doc.py
-\
+```
+
+---
+
 ## 📜 License
 
 MIT License — Free to use, modify, and distribute for personal, academic, or commercial projects.
 
 ---
 
-*Built with ❤️ by PBR VITS Engineering Team \| Powered by MediaPipe + Win32 SendInput*
-
+*Built with ❤️ by PBR VITS Engineering Team | Powered by MediaPipe + Win32 SendInput*
