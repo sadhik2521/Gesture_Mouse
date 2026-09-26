@@ -1,0 +1,22 @@
+# Core Vision & AI Tracking
+opencv-python>=4.8.0
+mediapipe>=0.10.0
+numpy>=1.24.0
+
+# User Interface
+customtkinter>=5.2.0
+pillow>=10.0.0
+
+# Windows System & Automation
+uiautomation>=2.0.18
+pywin32>=306
+
+# Analysis & Visualizations
+matplotlib>=3.7.0
+
+# Documentation & Presentation Generation
+python-docx>=0.8.11
+python-pptx>=0.6.21
+
+# Optional Machine Learning Model Retraining
+# tensorflow>=2.15.0

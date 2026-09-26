@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Office temporary lock files
+~$*.docx
+~$*.pptx
+*.tmp
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini

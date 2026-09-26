@@ -171,12 +171,12 @@ $$\text{Similarity (\%)} = e^{-\lambda \cdot D} \times 100$$
 
 ## 📈 Performance & Evaluation Graphs
 
-This section presents the performance evaluation graphs for the AI Gesture Mouse system, located in [`assets/plots/`](file:///c:/Users/shaik/Gesture_Mouse/assets/plots).
+This section presents the performance evaluation graphs for the AI Gesture Mouse system, located in [`results/plots/`](file:///c:/Users/shaik/Gesture_Mouse/assets/plots).
 
 ---
 
 ### 1. AI Model Training Accuracy & Loss Graphs
-![Accuracy and Loss Graphs](assets/plots/paper_accuracy_loss_section.png)
+![Accuracy and Loss Graphs](results/plots/paper_accuracy_loss_section.png)
 
 #### 💡 Simple Explanation:
 * **Top Graph — Gesture Accuracy (%)**:
@@ -191,7 +191,7 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 ---
 
 ### 2. Day-by-Day Project Progress & Evolution Chart
-![Day-by-Day Progress Chart](assets/plots/daily_progress_chart.png)
+![Day-by-Day Progress Chart](results/plots/daily_progress_chart.png)
 
 #### 💡 Simple Explanation:
 * **Top-Left (Accuracy Progression %)**: Tracks gesture classification accuracy improving day-by-day from **72.4% (Day 1)** to **99.9% (Day 12)**.
@@ -202,7 +202,7 @@ This section presents the performance evaluation graphs for the AI Gesture Mouse
 ---
 
 ### 3. Live Gestures vs. Original Training Data (Similarity)
-![Live Similarity Chart](assets/plots/simple_live_similarity.png)
+![Live Similarity Chart](results/plots/simple_live_similarity.png)
 
 #### 💡 Simple Explanation:
 * **What it shows**: How accurately real-time live hand movements captured by the webcam match the "perfect" taught gesture templates stored in the dataset.
@@ -265,37 +265,118 @@ python main.py
 
 ---
 
-## 📄 Research & Visual Generator Tools
+## 📁 Project Directory Structure
 
-```bash
-# Generate Academic Dashboard Plots & Paper Figures
-python plot_project_results.py
-
-# Generate Day-by-Day Progress Chart
-python plot_daily_progress_graph.py
-
-# Generate Anti-Dip & Smart UI Tracking Graphs
-python plot_v4_updates.py
-
-# Generate Gesture Control Reference Visual
-python create_gesture_guide_image.py
-```
-
+\Gesture_Mouse/
+├── main.py                       # Root application entry point
+├── README.md                     # Project documentation & overview
+├── requirements.txt              # Production dependency specifications
+│
+├── gestures/                     # All gesture tracking, recognition & control modules
+│   ├── __init__.py               # Gestures package exports
+│   ├── gesture_engine.py         # Core gesture tracking, One Euro & Kalman filter cascade
+│   ├── mouse_controller.py       # High-speed Win32 SendInput kernel mouse controller
+│   ├── train_gesture_model.py    # Gesture dataset collector & Neural Network trainer
+│   ├── live_test_graph.py        # Real-time gesture similarity match chart
+│   └── gesture_model.h5          # Trained Deep Neural Network weights
+│
+├── gui/                          # Graphical user interface layer
+│   ├── __init__.py               # GUI package exports
+│   └── gui.py                    # Modern CustomTkinter dark-themed control dashboard
+│
+├── dataset/                      # Feature matrices and dataset tables
+│   ├── gestures_data.csv         # Full labeled 63-coordinate landmark table (1,800 samples)
+│   ├── gestures_data_raw.csv     # Raw captured hand landmark data
+│   ├── gestures_labels.csv       # Gesture class IDs and labels
+│   ├── gesture_averages_reference.csv # Mathematical gesture template centroids
+│   ├── X_gestures.npy            # NumPy feature matrix (N, 63)
+│   ├── y_gestures.npy            # NumPy class labels (N,)
+│   └── training_history.npy      # Model training loss & accuracy history
+│
+├── results/                      # All output results files
+│   ├── plots/                    # Evaluation & benchmark plots
+│   │   ├── accuracy_graph.png
+│   │   ├── loss_graph.png
+│   │   ├── paper_accuracy_loss_section.png
+│   │   ├── daily_progress_chart.png
+│   │   └── simple_live_similarity.png
+│   └── documents/                # Generated reports & presentations
+│       ├── AI_Gesture_Mouse_Full_Documentation.docx
+│       ├── AI_Gesture_Mouse_Documentation.docx
+│       ├── AI_Gesture_Mouse_PPT_Detailed_Guide.docx
+│       └── AI_Gesture_Mouse_Presentation.pptx
+│
+├── scripts/                      # Analysis, plotting & document generation tools
+│   ├── __init__.py
+│   ├── plot_accuracy_loss.py     # Plots publication-ready accuracy & loss curves
+│   ├── plot_daily_progress_graph.py # Plots day-by-day 4-panel evolution charts
+│   ├── plot_simple_similarity.py # Plots live hand similarity match scores
+│   ├── create_gesture_guide_image.py # Generates gesture reference posters
+│   ├── build_full_project_word_doc.py # Generates comprehensive technical documentation
+│   ├── generate_word_doc.py      # Generates project Word report
+│   ├── generate_powerpoint_presentation.py # Generates complete slide deck
+│   └── generate_ppt_detailed_guide_doc.py  # Generates presentation guide
+│
+├── assets/                       # Static media, poster art & UI screenshots
+│   ├── gesture_signs_poster.jpg
+│   └── ui_dashboard.jpg
+│
+└── docs/                         # Extended Markdown documentation
+    └── PROJECT_DOCUMENTATION.md  # Detailed technical specifications & viva prep
+\
 ---
 
-⚙️ 2. How to Re-Generate the Word Document Anytime
-If you ever update the graphs or documentation in the future and want to update the Word document:
+## 🛠️ CLI Operations & Generator Scripts
 
-Open your terminal in the project directory (c:\Users\shaik\Gesture_Mouse).
-Run the generator script 
-generate_word_doc.py
-:
-powershell
+### 1. Launch Virtual Mouse Application
+\\ash
+python main.py
+\
+### 2. Dataset Collection & Gesture Model Training
+\\ash
+# Collect new gesture samples using webcam
+python gestures/train_gesture_model.py --collect
 
+# Replace a single gesture pose (e.g., gesture ID 3)
+python gestures/train_gesture_model.py --replace-gesture 3
 
-python generate_word_doc.py
-This will automatically read the latest graph images from assets/plots/ and create a fresh .docx file!
+# Synchronize edited gestures_data.csv into .npy matrices
+python gestures/train_gesture_model.py --from-csv
 
+# Train Deep Neural Network classifier
+python gestures/train_gesture_model.py --train --epochs 100
+
+# Launch Real-Time Gesture Similarity Match Meter
+python gestures/live_test_graph.py
+\
+### 3. Generate Evaluation Graphs (Saved to esults/plots/\)
+\\ash
+# Generate ML Model Accuracy & Loss Curves
+python scripts/plot_accuracy_loss.py
+
+# Generate Day-by-Day Progression Chart
+python scripts/plot_daily_progress_graph.py
+
+# Generate Live Template Similarity Comparison
+python scripts/plot_simple_similarity.py
+
+# Generate Visual Gesture Signs Poster
+python scripts/create_gesture_guide_image.py
+\
+### 4. Generate Reports & Documentation (Saved to esults/documents/\)
+\\ash
+# Generate Comprehensive Technical Word Documentation
+python scripts/build_full_project_word_doc.py
+
+# Generate Project Word Report
+python scripts/generate_word_doc.py
+
+# Generate PowerPoint Presentation Slide Deck
+python scripts/generate_powerpoint_presentation.py
+
+# Generate PowerPoint Viva & Presentation Guide
+python scripts/generate_ppt_detailed_guide_doc.py
+\
 ## 📜 License
 
 MIT License — Free to use, modify, and distribute for personal, academic, or commercial projects.
